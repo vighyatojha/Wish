@@ -10,11 +10,13 @@ import { useEffect, useState } from 'react';
 import { preloadStory } from './lib/preload';
 import { Intro } from './scenes/Intro';
 import { Sunrise } from './scenes/Sunrise';
+import { Gallery } from './scenes/Gallery';
 
 const skipTo = new URLSearchParams(location.search).get('scene');
 
 export function App() {
-  const jump = skipTo === 'sunrise';
+  if (skipTo === 'gallery') return <Gallery />;
+  const jump = skipTo === 'sunrise' || skipTo === 'tour';
   const [showIntro, setShowIntro] = useState(!jump);
   const [showSunrise, setShowSunrise] = useState(jump);
   const [flying, setFlying] = useState(jump);

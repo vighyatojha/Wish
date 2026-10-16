@@ -1,16 +1,21 @@
 // ─────────────────────────────────────────────────────────────
-//  Birthday bunting carried by birds
+//  Birthday bunting carried by fairies
 //
 //  • Each flag is painted once onto its own small canvas: speckled
 //    cream card, a hand-lettered capital, a little watercolour
 //    scene (mountain, pines, lake, yellow sun) and two metal
 //    eyelets, like the printed bunting she'd hang at a party.
 //  • Every frame the twine is drawn as a sagging curve between the
-//    birds' feet, and each flag hangs from it, tilting with the
-//    string and swinging on its own as the birds move.
-//  • The birds themselves are SVG (CuteBird); this file moves them.
+//    fairies' hands, and each flag hangs from it, tilting with the
+//    string and swinging on its own as the fairies move.
+//  • The fairies themselves are SVG (Fairy.tsx); this file moves them.
 // ─────────────────────────────────────────────────────────────
-import { BirdRig, FEET_POINT, blinker } from '../components/CuteBird';
+import { blinker } from '../components/CuteBird';
+import { FairyRig, FAIRY_HOLD, FAIRY_TOP } from '../components/Fairy';
+
+// a fairy is this many flag-widths wide (her 200-unit drawing box)
+const CARRIER = 1.75;
+const carrierScale = (fw: number) => (fw * CARRIER) / 200;
 
 // ── Painting one flag ─────────────────────────────────────────
 // Design units: the card is 100 × 130, drawn with a 10-unit margin
@@ -272,7 +277,7 @@ interface Row {
 }
 export interface BannerBird {
   g: SVGGElement;    // positioned group
-  rig: BirdRig;
+  rig: FairyRig;
 }
 
 export class Banner {
@@ -308,16 +313,17 @@ export class Banner {
     const lines = W / H > 1.05 ? this.words.wide : this.words.tall;
 
     // flag size: the longest line fits the width, all lines fit the top half
-    const units = (s: string) => [...s].reduce((n, ch) => n + (ch === ' ' ? 1.5 : 1.08), 0) + 0.84 + 1.15;
+    const units = (s: string) => [...s].reduce((n, ch) => n + (ch === ' ' ? 1.5 : 1.08), 0) + 0.84 + 1.6;
     const longest = Math.max(...lines.map(units));
-    const rowsHigh = lines.length * 3.3;
+    const rowsHigh = lines.length * 3.6;
     const fw = Math.min((W * 0.95) / longest, (H * 0.5) / rowsHigh, 74);
     this.fw = fw;
-    const bs = fw * 1.6;              // bird size
+    const bs = fw * CARRIER;          // fairy size
+    const above = (FAIRY_HOLD[1] - FAIRY_TOP) * carrierScale(fw); // her height above her hands
     const fh = fw * 1.3;              // flag height
 
     let birdIndex = 0;
-    let y = top + bs * 0.8;
+    let y = top + above;
     this.rows = lines.map((line, r) => {
       const chars = [...line];
       const widths = chars.map((ch) => (ch === ' ' ? 1.5 : 1.08) * fw);
@@ -341,7 +347,7 @@ export class Banner {
         cx: W / 2 + slack * 0.3 * (r % 2 ? -1 : 1),
         side: r % 2 ? -1 : 1, dx: 0, vx: 0,
       };
-      y += bs * 0.7 + sag + fh + fw * 0.3;
+      y += above + sag + fh + fw * 0.25;
       return row;
     });
 
@@ -359,7 +365,7 @@ export class Banner {
     const { g, fw, W, H, dpr } = this;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
-    const bs = fw * 1.6, sc = bs / 200;
+    const sc = carrierScale(fw), bs = fw * CARRIER;
     const step = dt > 0 ? dt : 1 / 60;
 
     this.rows.forEach((row, r) => {
@@ -383,9 +389,9 @@ export class Banner {
       const feet = row.anchors.map((ax0, k) => {
         const b = row.birds[k];
         const moving = Math.min(1, Math.abs(vx) / 600 + a * 2);
-        this.phases[b] += step * (15 + moving * 9);
+        this.phases[b] += step * (30 + moving * 12);
         const ph = this.phases[b];
-        const bob = Math.sin(time * 1.9 + b * 1.3) * fw * 0.1 - Math.sin(ph) * fw * 0.035;
+        const bob = Math.sin(time * 1.9 + b * 1.3) * fw * 0.12 - Math.abs(Math.cos(ph)) * fw * 0.02;
         const x = row.cx + ax0 + offX + Math.sin(time * 0.9 + b) * fw * 0.06;
         const y = row.y + offY + bob;
         const p = this.prev[b];
@@ -395,10 +401,9 @@ export class Banner {
         p.y = y;
         const bird = this.birds[b];
         bird.g.style.visibility = 'visible';
-        bird.g.setAttribute('transform', `translate(${(x - FEET_POINT[0] * sc).toFixed(1)} ${(y - FEET_POINT[1] * sc).toFixed(1)}) scale(${sc.toFixed(4)})`);
-        const flap = -34 + 46 * Math.sin(ph);
-        bird.rig.pose({ wingR: flap, wingL: flap, tilt: p.tilt, squash: Math.sin(ph) * 0.015, blink: this.blinks[b](time) });
-        return [x, y + bs * 0.005] as const;
+        bird.g.setAttribute('transform', `translate(${(x - FAIRY_HOLD[0] * sc).toFixed(1)} ${(y - FAIRY_HOLD[1] * sc).toFixed(1)}) scale(${sc.toFixed(4)})`);
+        bird.rig.pose(ph, p.tilt, time, this.blinks[b](time), b * 1.7);
+        return [x, y] as const;
       });
 
       // twine between each pair of birds, and the flags hanging from it

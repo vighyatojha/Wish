@@ -256,3 +256,27 @@ export function playChirp(pitch = 1, notes = 3): void {
   }
   window.setTimeout(() => pan.disconnect(), 1200);
 }
+
+// ── A soft "bloop" as an animal pops up (or ducks away) ───────
+export function playPop(pitch = 1): void {
+  if (!ctx || !master) return;
+  const ac = ctx;
+  const t = ac.currentTime + 0.01;
+  const o = new OscillatorNode(ac, { type: 'sine', frequency: 320 * pitch });
+  o.frequency.setValueAtTime(260 * pitch, t);
+  o.frequency.exponentialRampToValueAtTime(720 * pitch, t + 0.09);
+  const g = new GainNode(ac, { gain: 0 });
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.22, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+  // a little sparkle on top
+  const s = new OscillatorNode(ac, { type: 'triangle', frequency: 2100 * pitch });
+  const sg = new GainNode(ac, { gain: 0 });
+  sg.gain.setValueAtTime(0, t + 0.05);
+  sg.gain.linearRampToValueAtTime(0.04, t + 0.06);
+  sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+  o.connect(g).connect(master);
+  s.connect(sg).connect(master);
+  o.start(t); o.stop(t + 0.25);
+  s.start(t); s.stop(t + 0.32);
+}

@@ -92,3 +92,30 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* under the bunting: tap anywhere to go on */
+.greet__tap {
+  all: unset;
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  padding-bottom: calc(9% + env(safe-area-inset-bottom));
+  -webkit-tap-highlight-color: transparent;
+}
+.greet__hint {
+  padding: 0.55rem 1.1rem 0.6rem;
+  font: 400 clamp(1.15rem, 1rem + 0.6vw, 1.35rem) / 1.2 'Patrick Hand', 'Comic Sans MS', cursive;
+  color: #3a2a1e;
+  background: rgba(251, 243, 225, 0.92);
+  border: 1.5px solid rgba(91, 59, 41, 0.6);
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(18, 12, 4, 0.25);
+  animation: hint-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both, hint-breathe 2.4s ease-in-out 0.4s infinite;
+}
+@keyframes hint-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes hint-breathe { 50% { opacity: 0.7; } }
+@media (prefers-reduced-motion: reduce) { .greet__hint { animation: none; } }

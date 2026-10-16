@@ -38,28 +38,28 @@ export const content = {
     // The word "bell" is highlighted automatically.
     lines: ['Hi!', 'How was the surprise?', 'Now tap the bell to move further.'],
     bellLabel: 'Ring the bell',
-    // The birds carry these on bunting, with her name (above) underneath.
+    // The fairies carry these on bunting, with her name (above) underneath.
     banner: 'Happy Birthday',
+    // Shown under the bunting once it has settled.
+    continueHint: 'Tap anywhere to continue',
   },
 
-  // ── Page 2b: the fog, the valley and the treasure map ───────
-  sunrise: {
-    // Shown once the valley has opened, before she scrolls.
-    instruction: {
-      touch: 'Swipe up slowly to follow the trail.',
-      mouse: 'Scroll down slowly to follow the trail.',
-    },
-
-    // Written on the treasure map, one per stretch of scrolling.
-    // The sun moves across the sky as she scrolls: late morning →
-    // mid-afternoon. Golden hour, sunset and night come in later scenes.
-    // Keep each to a sentence or two so it fits on a phone.
-    // These are placeholders: replace them with your own words.
-    messages: [
-      'The rain’s over. This whole morning is yours.',
-      'Some people feel like sunrise. You’re one of them.',
-      'Thank you for every laugh, every long talk, and every time you showed up.',
-      'Stay a little longer. The sky has more to say after sunset.',
+  // ── Page 2b: the animals with cards, around the valley ─────
+  // After the bunting, the camera visits one place after another.
+  // At each, a little animal pops up holding a rolled card; it opens
+  // into one of these messages. She taps to go on to the next.
+  // The sun moves across the sky as she goes: late morning →
+  // mid-afternoon. Golden hour, sunset and night come in later scenes.
+  // Keep each to a sentence or two so it fits on a phone.
+  // These are placeholders: replace them with your own words.
+  tour: {
+    cards: [
+      { animal: 'bunny', from: 'from the little Bunny', message: 'The rain’s over. This whole morning is yours.' },
+      { animal: 'fox', from: 'from the Fox by the farmhouse', message: 'Some people feel like sunrise. You’re one of them.' },
+      { animal: 'duckling', from: 'from the Duckling on the river', message: 'Thank you for every laugh, every long talk, and every time you showed up.' },
+      { animal: 'hedgehog', from: 'from the Hedgehog on the rock', message: 'You make ordinary days feel like little celebrations.' },
+      { animal: 'squirrel', from: 'from the Squirrel on the far bank', message: 'Stay a little longer. The sky has more to say after sunset.' },
     ],
+    tapHint: 'Tap to continue',
   },
 } as const;

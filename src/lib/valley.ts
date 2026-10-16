@@ -58,6 +58,9 @@ uniform float uTime;
 uniform vec2  uSun;             // the sun painted in the picture, picture coordinates
 uniform float uAspect;          // picture width / height
 uniform float uLod;             // depth-of-field blur (0 = sharp)
+uniform vec4  uFocus;           // sharp spot on screen: x, y, sharp radius, fully-soft radius (0 = off)
+uniform float uScreenAspect;    // screen width / height
+float gLod;                     // blur at this pixel (uLod, eased around the sharp spot)
 uniform float uDay;             // 0 dawn (the photo) · 1 late morning · 2 afternoon · 3 golden hour
 uniform vec2  uSunNow;          // where the sun is right now, picture coordinates
 uniform float uSunAmt;          // 0 → 1 how much of the moving sun to draw
@@ -68,12 +71,12 @@ float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 
 // Soft-focus sample: four taps spread around the point at the chosen blur level.
 vec3 img(vec2 uv) {
-  if (uLod < 0.05) return texture(uImg, uv).rgb;
-  vec2 px = exp2(uLod) / vec2(2048.0, 1153.0) * 0.6;
-  return 0.25 * (textureLod(uImg, uv + vec2( px.x,  px.y * 0.4), uLod).rgb
-               + textureLod(uImg, uv + vec2(-px.x, -px.y * 0.4), uLod).rgb
-               + textureLod(uImg, uv + vec2( px.x * 0.4, -px.y), uLod).rgb
-               + textureLod(uImg, uv + vec2(-px.x * 0.4,  px.y), uLod).rgb);
+  if (gLod < 0.05) return texture(uImg, uv).rgb;
+  vec2 px = exp2(gLod) / vec2(2048.0, 1153.0) * 0.6;
+  return 0.25 * (textureLod(uImg, uv + vec2( px.x,  px.y * 0.4), gLod).rgb
+               + textureLod(uImg, uv + vec2(-px.x, -px.y * 0.4), gLod).rgb
+               + textureLod(uImg, uv + vec2( px.x * 0.4, -px.y), gLod).rgb
+               + textureLod(uImg, uv + vec2(-px.x * 0.4,  px.y), gLod).rgb);
 }
 
 // Moves the picture along a flow without ever "running out":
@@ -124,6 +127,11 @@ vec3 grade(vec3 c, vec2 uv, vec3 m, float daylight) {
 }
 
 void main() {
+  gLod = uLod;
+  if (uFocus.w > 0.0) {
+    float fd = length((vUv - uFocus.xy) * vec2(uScreenAspect, 1.0));
+    gLod = uLod * smoothstep(uFocus.z, uFocus.w, fd);
+  }
   vec2 s  = uZoomC + (vUv - uZoomC) / uZoom;
   vec2 uv = uOffset + s * uSpan;
   vec3 m  = texture(uMask, uv).rgb;
@@ -157,7 +165,7 @@ void main() {
     mat2 rot = mat2(0.8, -0.6, 0.6, 0.8);
     float g1 = noise(rot * (uv * vec2(41.0, 77.0)) + vec2(0.13, -t * 0.05));
     float g2 = noise(rot * rot * (uv * vec2(57.0, 103.0)) + vec2(t * 0.02, -t * 0.07) + 0.37);
-    glint = smoothstep(0.55, 0.76, g1 * g2) * smoothstep(0.42, 0.75, luma(w)) * m.b * (1.0 - uLod * 0.3);
+    glint = smoothstep(0.55, 0.76, g1 * g2) * smoothstep(0.42, 0.75, luma(w)) * m.b * (1.0 - gLod * 0.3);
   }
 
   col = grade(col, uv, m, daylight);
@@ -189,7 +197,7 @@ void main() {
   float rs = length(ds);
   float skyVis = clamp(m.r * 1.6, 0.0, 1.0);
   vec3 sunCol = mix(vec3(1.0, 0.98, 0.93), vec3(1.0, 0.76, 0.45), uSunWarm);
-  float soft = 0.003 + uLod * 0.0025;               // out of focus, the sun becomes a soft bright disk
+  float soft = 0.003 + gLod * 0.0025;               // out of focus, the sun becomes a soft bright disk
   float disk = 1.0 - smoothstep(0.02 - soft, 0.02 + soft, rs);
   float halo = exp(-rs * 14.0) * 0.75 + exp(-rs * 4.0) * 0.22;
   col = mix(col, sunCol * 1.15, disk * skyVis * uSunAmt);
@@ -210,6 +218,8 @@ export interface ValleyFrame {
   sun: Vec2;          // where the moving sun is, in picture coordinates
   sunAmount: number;  // 0 → 1 how strongly to draw it
   sunWarm: number;    // 0 white → 1 orange
+  // keep this spot sharp (screen 0–1; radii in screen heights) while the rest blurs
+  focus?: { x: number; y: number; sharp: number; soft: number };
 }
 
 export interface ValleyPicture {
@@ -258,7 +268,7 @@ export class Valley {
   ) {
     this.program = createProgram(gl, FRAG);
     gl.useProgram(this.program);
-    this.u = uniforms(gl, this.program, ['uImg', 'uMask', 'uNoise', 'uOffset', 'uSpan', 'uZoomC', 'uZoom', 'uTime', 'uSun', 'uAspect', 'uLod', 'uDay', 'uSunNow', 'uSunAmt', 'uSunWarm'] as const);
+    this.u = uniforms(gl, this.program, ['uImg', 'uMask', 'uNoise', 'uOffset', 'uSpan', 'uZoomC', 'uZoom', 'uTime', 'uSun', 'uAspect', 'uLod', 'uDay', 'uSunNow', 'uSunAmt', 'uSunWarm', 'uFocus', 'uScreenAspect'] as const);
     this.textures = [
       createTexture(gl, 0, img, { mipmaps: true }),
       createTexture(gl, 1, masks),
@@ -291,6 +301,9 @@ export class Valley {
     gl.uniform2f(u.uSunNow, f.sun[0], f.sun[1]);
     gl.uniform1f(u.uSunAmt, f.sunAmount);
     gl.uniform1f(u.uSunWarm, f.sunWarm);
+    const fo = f.focus;
+    gl.uniform4f(u.uFocus, fo?.x ?? 0, fo?.y ?? 0, fo?.sharp ?? 0, fo?.soft ?? 0);
+    gl.uniform1f(u.uScreenAspect, this.canvas.width / Math.max(1, this.canvas.height));
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 

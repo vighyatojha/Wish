@@ -11,9 +11,9 @@
 //  • she taps the bell: it rings, the bird hops and sings, the
 //    camera pulls back, the focus returns, and the bird flies off
 //    as the branch drifts away;
-//  • birds of every colour fly in carrying bunting:
-//    HAPPY BIRTHDAY, and her name underneath.
-//  When she starts scrolling, the birds carry the bunting up and away.
+//  • six little flower fairies fly in carrying bunting:
+//    HAPPY BIRTHDAY, and her name underneath;
+//  • she taps to go on: the fairies carry the bunting up and away.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { content } from '../content';
@@ -22,6 +22,7 @@ import { buzz, prefersReducedMotion } from '../lib/device';
 import { playBell, playChirp } from '../lib/audio';
 import { Banner, type BannerBird } from '../lib/bunting';
 import { BirdArt, BirdRig, GrainPattern, birdColors, blinker, FEATHERS, FEET_POINT } from '../components/CuteBird';
+import { FairyArt, FairyRig, FAIRIES } from '../components/Fairy';
 import { BRANCH, BIRD_SPOT, BELL, LEAVES, leafPath, ZOOM_ON } from './greetingBranch';
 import './greeting.css';
 
@@ -31,7 +32,6 @@ const WORDS = {
   wide: [`${copy.banner.toUpperCase()}`, NAME],
   tall: [...copy.banner.toUpperCase().split(' '), NAME],
 };
-const FLOCK = [FEATHERS.blue, FEATHERS.pink, FEATHERS.yellow, FEATHERS.mint, FEATHERS.lavender, FEATHERS.coral];
 const PERCHED_SCALE = 0.48; // the bird is 96 branch-units tall
 
 /** Values the valley reads: how out of focus it is, and how far the bunting has flown away. */
@@ -43,7 +43,7 @@ export interface GreetShared {
 interface Props {
   active: boolean;   // the valley has opened and page 1 is gone
   shared: GreetShared;
-  onDone: () => void; // the bunting is up: scrolling can begin
+  onDone: () => void; // she has seen the bunting and tapped to go on
 }
 
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -70,6 +70,7 @@ export function Greeting({ active, shared, onDone }: Props) {
   const ready = useRef(false);
   const [bellReady, setBellReady] = useState(false);
   const [gone, setGone] = useState(false);
+  const [hint, setHint] = useState(false); // "tap to continue" under the bunting
 
   // GSAP animates these; the frame loop draws from them.
   const S = useRef({
@@ -78,7 +79,6 @@ export function Greeting({ active, shared, onDone }: Props) {
   }).current;
   const L = useRef({ W: 1, H: 1, u: 1, top: 0, Z: 2, focusY: 0.62 }).current;
   const blueColors = useMemo(() => birdColors(FEATHERS.blue), []);
-  const flockColors = useMemo(() => FLOCK.map(birdColors), []);
 
   // ── Frame loop ───────────────────────────────────────────────
   useEffect(() => {
@@ -111,7 +111,7 @@ export function Greeting({ active, shared, onDone }: Props) {
     // the bunting needs its lettering font before the flags are painted
     void document.fonts.load('400 50px "Patrick Hand"').finally(() => {
       if (cancelled) return;
-      const birds: BannerBird[] = flockRefs.current.map((g) => ({ g: g!, rig: new BirdRig(g!) }));
+      const birds: BannerBird[] = flockRefs.current.map((g) => ({ g: g!, rig: new FairyRig(g!) }));
       banner = new Banner(flockCanvas.current!, birds, WORDS);
       layout();
     });
@@ -249,7 +249,7 @@ export function Greeting({ active, shared, onDone }: Props) {
     playBell();
     buzz(25);
     const reduced = prefersReducedMotion();
-    gsap.timeline({ onComplete: onDone })
+    gsap.timeline()
       // the bird hops and sings
       .to(S, { hop: 1, duration: 0.18, ease: 'power2.out' }, 0.08)
       .to(S, { hop: 0, duration: 0.3, ease: 'power2.in' }, 0.26)
@@ -271,7 +271,19 @@ export function Greeting({ active, shared, onDone }: Props) {
       .to(S, { row2: 1, duration: 2.6, ease: 'power3.out' }, 3.4)
       .call(() => playChirp(1.0, 3), [], 3.6)
       .call(() => playChirp(1.25, 2), [], 4.3)
-      .call(() => playChirp(0.92, 3), [], 5.0);
+      .call(() => playChirp(0.92, 3), [], 5.0)
+      // once the bunting has settled, invite her to go on
+      .call(() => setHint(true), [], 7.2);
+  }
+
+  // ── She taps to go on: the fairies fly off with the bunting ──
+  function goOn() {
+    if (!hint) return;
+    setHint(false);
+    buzz(12);
+    gsap.timeline()
+      .to(shared, { away: 1, duration: 2.6, ease: 'power1.in' }, 0)
+      .call(onDone, [], 1.1);
   }
 
   const words = (line: string) =>
@@ -283,16 +295,21 @@ export function Greeting({ active, shared, onDone }: Props) {
     <div className="layer greet" aria-live="polite">
       <div ref={vignette} className="layer greet__vignette" />
 
-      {/* the bunting and the birds carrying it */}
+      {/* the bunting and the fairies carrying it */}
       <canvas ref={flockCanvas} className="layer greet__bunting" />
       <svg className="layer greet__flock" aria-hidden="true">
         <defs><GrainPattern id="grain-flock" /></defs>
-        {flockColors.map((c, i) => (
+        {FAIRIES.map((look, i) => (
           <g key={i} ref={(el) => { flockRefs.current[i] = el; }} style={{ visibility: 'hidden' }}>
-            <BirdArt colors={c} grain="grain-flock" />
+            <FairyArt look={look} grain="grain-flock" />
           </g>
         ))}
       </svg>
+      {hint && (
+        <button type="button" className="layer greet__tap" onPointerDown={goOn} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') goOn(); }} autoFocus>
+          <span className="greet__hint">{copy.continueHint}</span>
+        </button>
+      )}
       <h2 className="greet__sr">{copy.banner}, {content.name}</h2>
 
       {/* the branch, the bell and the bird (all scale together for the close-up) */}

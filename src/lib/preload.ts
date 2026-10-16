@@ -1,8 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 //  Quietly fetch page 2's heavy pieces while she is still on
 //  page 1 (reading the question), so nothing arrives late:
-//  the valley picture and its masks, the birdsong, and the 3D
-//  meadow code. The browser keeps them in its cache.
+//  the valley picture and its masks, and the birdsong. The browser keeps them in its cache.
 // ─────────────────────────────────────────────────────────────
 import valleyUrl from '../assets/valley.webp';
 import masksUrl from '../assets/valley-masks.png';
@@ -19,5 +18,4 @@ export function preloadStory(): void {
     img.src = url;
   }
   void fetch(ambientUrl).catch(() => {});
-  void import('../three/StumpScene').catch(() => {});
 }
