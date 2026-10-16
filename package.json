@@ -12,6 +12,7 @@
     "@fontsource/eb-garamond": "^5.3.0",
     "@fontsource/im-fell-english": "^5.3.0",
     "@fontsource/im-fell-english-sc": "^5.3.0",
+    "@fontsource/patrick-hand": "^5.3.0",
     "@gsap/react": "^2.1.2",
     "@react-three/fiber": "^9.8.2",
     "firebase": "^13.0.0",

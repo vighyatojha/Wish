@@ -5,7 +5,7 @@
 
 export const content = {
   // Her name, exactly as it should appear on the first page.
-  name: 'Aanya',
+  name: 'Varsha',
 
   // ── Page 1: the white page ──────────────────────────────────
   intro: {
@@ -31,7 +31,18 @@ export const content = {
     letInMessage: 'Close enough. Come in.',
   },
 
-  // ── Page 2: the fog, the valley and the treasure map ────────
+  // ── Page 2a: the little bird on the branch ──────────────────
+  // It lands once the valley has opened, before the scrolling starts.
+  greeting: {
+    // Each line starts on its own line in the speech bubble.
+    // The word "bell" is highlighted automatically.
+    lines: ['Hi!', 'How was the surprise?', 'Now tap the bell to move further.'],
+    bellLabel: 'Ring the bell',
+    // The birds carry these on bunting, with her name (above) underneath.
+    banner: 'Happy Birthday',
+  },
+
+  // ── Page 2b: the fog, the valley and the treasure map ───────
   sunrise: {
     // Shown once the valley has opened, before she scrolls.
     instruction: {

@@ -6,6 +6,9 @@
 //  • The camera flies through the fog into the valley, now in
 //    late-morning light: clouds drift, mist creeps, the river
 //    glitters, birds fly across.
+//  • A little bird lands on a branch, says hello in close-up and
+//    asks her to ring the bell; then a flock flies in with
+//    HAPPY BIRTHDAY bunting and her name (see Greeting.tsx).
 //  • A small card tells her how to scroll.
 //
 //  As she scrolls (one GSAP ScrollTrigger timeline):
@@ -28,6 +31,7 @@ import { Fog } from '../lib/fog';
 import { Valley, coverLayout, toScreen, type CoverLayout, type ValleyPicture, type Vec2 } from '../lib/valley';
 import { Birds } from '../lib/birds';
 import { TreasureMap } from '../components/TreasureMap';
+import { Greeting, type GreetShared } from './Greeting';
 import type { StumpState } from '../three/StumpScene';
 import valleyUrl from '../assets/valley.webp';
 import masksUrl from '../assets/valley-masks.png';
@@ -129,6 +133,9 @@ export function Sunrise({ flying, entered }: Props) {
   const [stumpRunning, setStumpRunning] = useState(false);
   const stumpLayer = useRef<HTMLDivElement>(null);
   const [noFog, setNoFog] = useState(false);
+  // the bird on the branch has said hello and the bunting is up
+  const [greeted, setGreeted] = useState(false);
+  const greet = useRef<GreetShared>({ focus: 0, away: 0 }).current;
 
   // GSAP animates these numbers; the frame loop draws from them.
   const cam = useRef({
@@ -186,7 +193,8 @@ export function Sunrise({ flying, entered }: Props) {
 
       // the camera: flight zoom, then the glide down to the riverbank
       const g = cam.glide;
-      const zoom = mix(cam.zoom, glideZoom(W / H), g);
+      // (the close-up on the bird pushes in a touch and softens the valley)
+      const zoom = mix(cam.zoom, glideZoom(W / H), g) * (1 + greet.focus * 0.05);
       const center: Vec2 = [mix(FLY_TO[0], GLIDE_TO[0], g), mix(FLY_TO[1], GLIDE_TO[1], g)];
       const map = (uv: Vec2) => toScreen(uv, layout, zoom, center);
       const sunScreen = sunAt(cam.day, map(PICTURE.sun));
@@ -200,7 +208,7 @@ export function Sunrise({ flying, entered }: Props) {
           layout.offset[1] + layout.span[1] * (center[1] + (sunScreen[1] - center[1]) / zoom),
         ];
         valley.render({
-          time, layout, zoom, zoomCenter: center, blur: g * 2.4, day: cam.day,
+          time, layout, zoom, zoomCenter: center, blur: g * 2.4 + greet.focus * 2.6, day: cam.day,
           sun: sunUv,
           sunAmount: cam.light * (1 - cam.haze) * (1 - clamp((cam.day - 2.6) / 0.4)),
           sunWarm: clamp((cam.day - 1.3) / 1.5),
@@ -208,10 +216,11 @@ export function Sunrise({ flying, entered }: Props) {
       } else if (still.current && Math.abs(zoom - lastZoom) > 0.00005) {
         still.current.style.transformOrigin = `${center[0] * 100}% ${center[1] * 100}%`;
         still.current.style.transform = `scale(${zoom.toFixed(5)})`;
+        still.current.style.filter = greet.focus > 0.01 ? `blur(${(greet.focus * 6).toFixed(1)}px)` : '';
         lastZoom = zoom;
       }
 
-      birds.render({ time, dt, toScreen: map, scale: (H / layout.span[1] / 941) * zoom, visible: cam.life * (1 - g) });
+      birds.render({ time, dt, toScreen: map, scale: (H / layout.span[1] / 941) * zoom, visible: cam.life * (1 - g) * (1 - greet.focus) });
 
       if (fog) {
         fog.render({ time, travel: cam.travel, haze: cam.haze, light: cam.light, mist: 0, sun: sunScreen, focus: FLY_TO });
@@ -268,7 +277,7 @@ export function Sunrise({ flying, entered }: Props) {
       wind.current?.stop(0.5);
       ambient.current?.pause();
     };
-  }, [cam, stump]);
+  }, [cam, stump, greet]);
 
   // ── The flight through the fog (automatic) ──────────────────
   useGSAP(
@@ -317,7 +326,7 @@ export function Sunrise({ flying, entered }: Props) {
       .catch(() => { /* sound not allowed yet (only when skipping page 1) */ });
   }
 
-  const live = arrived && entered;
+  const live = arrived && entered && greeted;
 
   // ── The scroll story (one ScrollTrigger timeline) ───────────
   useGSAP(
@@ -354,6 +363,9 @@ export function Sunrise({ flying, entered }: Props) {
 
       // 1. the instruction leaves
       tl.fromTo('.sunrise__instruction', { autoAlpha: 1, y: 0 }, { autoAlpha: 0, y: rise(-10), duration: 0.06, ease: ease.exit, immediateRender: false }, T.instructionOut);
+
+      // the birds carry the bunting up and away
+      tl.to(greet, { away: 1, duration: 0.5 }, 0);
 
       // 2. motion graphics: compass, trail, X
       tl.to(cam, { compass: 1, duration: 0.18, ease: 'back.out(1.6)' }, T.trail)
@@ -454,6 +466,8 @@ export function Sunrise({ flying, entered }: Props) {
                 </Suspense>
               </div>
             )}
+
+            <Greeting active={arrived && entered} shared={greet} onDone={() => setGreeted(true)} />
 
             <TreasureMap ref={mapRef} messages={copy.messages} initial={content.name.charAt(0)} />
 

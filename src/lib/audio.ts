@@ -201,3 +201,58 @@ export function playRustle(): void {
   src.connect(bp).connect(hp).connect(g).connect(master);
   src.start();
 }
+
+// ── A small brass bell: a few inharmonic partials ringing out ──
+export function playBell(): void {
+  if (!ctx || !master) return;
+  const ac = ctx;
+  const out = new GainNode(ac, { gain: 0.55 });
+  out.connect(master);
+  const strike = (at: number, level: number) => {
+    const f0 = 1560;
+    const partials: [number, number, number][] = [
+      // ratio, loudness, ring time (s)
+      [0.5, 0.16, 1.6], [1, 1, 2.2], [2.01, 0.42, 1.4], [2.74, 0.34, 1.0], [4.07, 0.2, 0.6], [5.42, 0.13, 0.4],
+    ];
+    for (const [ratio, amp, ring] of partials) {
+      const o = new OscillatorNode(ac, { frequency: f0 * ratio * (1 + (Math.random() - 0.5) * 0.002) });
+      const g = new GainNode(ac, { gain: 0 });
+      g.gain.setValueAtTime(0, at);
+      g.gain.linearRampToValueAtTime(amp * 0.3 * level, at + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + ring);
+      o.connect(g).connect(out);
+      o.start(at);
+      o.stop(at + ring + 0.05);
+    }
+  };
+  const t = ac.currentTime + 0.01;
+  strike(t, 1);
+  strike(t + 0.21, 0.55); // the clapper swings back
+  strike(t + 0.46, 0.25);
+  window.setTimeout(() => out.disconnect(), 3200);
+}
+
+// ── A songbird's chirp: quick rising-and-falling whistles ─────
+export function playChirp(pitch = 1, notes = 3): void {
+  if (!ctx || !master) return;
+  const ac = ctx;
+  const pan = new StereoPannerNode(ac, { pan: (Math.random() - 0.5) * 0.8 });
+  pan.connect(master);
+  let t = ac.currentTime + 0.01;
+  for (let i = 0; i < notes; i++) {
+    const p = pitch * (1 + (Math.random() - 0.5) * 0.12);
+    const o = new OscillatorNode(ac, { type: 'sine', frequency: 2600 * p });
+    const g = new GainNode(ac, { gain: 0 });
+    o.frequency.setValueAtTime(2500 * p, t);
+    o.frequency.exponentialRampToValueAtTime(4300 * p, t + 0.045);
+    o.frequency.exponentialRampToValueAtTime(3100 * p, t + 0.09);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.07, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+    o.connect(g).connect(pan);
+    o.start(t);
+    o.stop(t + 0.12);
+    t += 0.1 + Math.random() * 0.05;
+  }
+  window.setTimeout(() => pan.disconnect(), 1200);
+}
