@@ -1,0 +1,110 @@
+/* ─────────────────────────────────────────────────────────────
+   Page 2: through the fog to the living valley
+   ───────────────────────────────────────────────────────────── */
+.sunrise { z-index: 1; background: #9a958b; color: var(--light); }
+
+/* The scroller is the whole screen. Inside it a tall track gives
+   her something to swipe through, and the stage sticks to the
+   screen while she does. */
+.sunrise__scroller {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;            /* switched on once the valley has opened */
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.sunrise__scroller::-webkit-scrollbar { display: none; }
+.sunrise__scroller.is-live { overflow-y: auto; }
+
+.sunrise__stage {
+  position: sticky;
+  top: 0;
+  height: var(--vh);
+  overflow: hidden;
+}
+
+.sunrise__still {
+  object-fit: cover;
+}
+
+/* simple fog for phones without WebGL2 */
+.sunrise__fog-simple {
+  inset: -10%;
+  width: 120%;
+  height: 120%;
+  background: radial-gradient(ellipse at 62% 34%, #fff6e4 0%, #eceae6 38%, #c9ccd1 100%);
+  will-change: transform, opacity;
+}
+
+/* ── Treasure trail (motion graphics over the valley) ──────── */
+.trail { overflow: visible; }
+.trail__dots {
+  fill: none;
+  stroke: #fff3d6;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-dasharray: 0.1 11;
+  filter: drop-shadow(0 1px 1.5px rgba(40, 24, 8, 0.75));
+}
+.trail__compass circle { fill: rgba(243, 228, 195, 0.92); stroke: #5b3a1b; stroke-width: 1.4; }
+.trail__compass path { fill: #5b3a1b; }
+.trail__compass .trail__needle { fill: #8e1c12; }
+.trail__compass { filter: drop-shadow(0 2px 3px rgba(30, 18, 6, 0.5)); }
+.trail__mark path {
+  fill: none;
+  stroke: #b3261a;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 1px 2px rgba(30, 10, 4, 0.7));
+}
+
+/* ── Instruction card: optically centred, a little above middle ── */
+.sunrise__instruction {
+  position: absolute;
+  inset: 0 0 12% 0;
+  margin: auto;
+  width: min(80vw, 20rem);
+  height: fit-content;
+  pointer-events: none;
+}
+.sunrise__instruction-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.8rem;
+  padding: 1.15rem 1.4rem 1.2rem;
+  text-align: center;
+  font: italic 400 var(--step-1) / 1.35 'IM Fell English', serif;
+  color: #3a2412;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(255, 250, 235, 0.55), transparent 70%),
+    linear-gradient(#efdfba, #e0c592);
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(90, 58, 27, 0.35), 0 10px 26px rgba(20, 12, 4, 0.35), inset 0 0 24px rgba(120, 80, 30, 0.28);
+  text-wrap: balance;
+  visibility: hidden;
+}
+/* a dot rising inside a slim track: "move up" */
+.sunrise__instruction-icon {
+  position: relative;
+  width: 18px;
+  height: 30px;
+  border: 1.6px solid #5b3a1b;
+  border-radius: 9px;
+}
+.sunrise__instruction-icon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  width: 4px;
+  height: 7px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: #8e1c12;
+  animation: swipe-hint 1.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+@keyframes swipe-hint {
+  0%   { transform: translateY(0); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: translateY(-13px); opacity: 0; }
+}

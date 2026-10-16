@@ -1,0 +1,72 @@
+/* ─────────────────────────────────────────────────────────────
+   Tokens
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --paper: #ffffff;
+  --ink: #1c2333;            /* blue-black fountain-pen ink */
+  --ink-soft: #5f6679;       /* hints and feedback (4.9:1 on white) */
+  --ink-line: rgba(28, 35, 51, 0.35);
+  --light: #fff7ea;          /* words over the valley */
+
+  --serif: 'EB Garamond', Georgia, 'Times New Roman', serif;
+
+  /* Fluid type scale: every size grows smoothly between a small
+     phone and a laptop, with no jumps at breakpoints. */
+  --step--1: clamp(0.95rem, 0.9rem + 0.2vw, 1.05rem);
+  --step-0: clamp(1.05rem, 1rem + 0.25vw, 1.2rem);
+  --step-1: clamp(1.3rem, 1.18rem + 0.55vw, 1.6rem);
+  --step-2: clamp(1.7rem, 1.4rem + 1.6vw, 2.4rem);
+  --step-name: clamp(3.25rem, min(17vw, 9svh), 6rem);
+
+  --gutter: clamp(24px, 5vw, 56px);
+  --vh: 100svh;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Base
+   ───────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 18px;
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  font-kerning: normal;
+  overscroll-behavior: none;            /* no pull-to-refresh mid-story */
+  -webkit-tap-highlight-color: transparent;
+}
+body { overflow: hidden; }              /* each scene controls its own scrolling */
+
+button, input { font: inherit; color: inherit; }
+button { background: none; border: 0; cursor: pointer; touch-action: manipulation; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+
+.scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: var(--vh);
+  overflow: hidden;
+}
+
+/* Fills its parent; used by every effect canvas */
+.layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,106 @@
+/* ─────────────────────────────────────────────────────────────
+   Page 1: the white page
+   ───────────────────────────────────────────────────────────── */
+.intro { z-index: 10; background: var(--paper); }
+.intro.is-wet { background: transparent; }   /* the paper canvas takes over */
+.intro.is-gone { pointer-events: none; }
+
+/* Tap to begin: optically centred (a touch above the true middle) */
+.intro__tap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 var(--gutter) 6svh;
+  user-select: none;
+}
+.intro__tap-text {
+  max-width: 18em;
+  font-style: italic;
+  font-size: var(--step-0);
+  line-height: 1.5;
+  color: var(--ink-soft);
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* The page: greeting at the top, question a little above centre */
+.intro__page {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding:
+    max(11svh, calc(env(safe-area-inset-top) + 48px))
+    var(--gutter)
+    max(32px, env(safe-area-inset-bottom));
+}
+
+.intro__hello {
+  font-style: italic;
+  font-size: var(--step-2);
+  line-height: 1.2;
+}
+.intro__name {
+  font-weight: 400;
+  font-size: var(--step-name);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.intro__form {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 26rem;
+  margin-top: -6svh;
+}
+.intro__question {
+  font-size: var(--step-1);
+  line-height: 1.45;
+  max-width: 18em;
+  text-wrap: pretty;
+}
+.intro__input {
+  width: 100%;
+  margin-top: 1.25rem;
+  padding: 0.35rem 0 0.4rem;
+  font-size: var(--step-1);
+  background: transparent;
+  border: 0;
+  border-bottom: 1.5px solid var(--ink-line);
+  border-radius: 0;
+  outline: none;
+  caret-color: var(--ink);
+  transition: border-color 180ms ease-out;
+}
+.intro__input::placeholder { color: rgba(28, 35, 51, 0.36); font-style: italic; }
+.intro__input:focus { border-bottom-color: var(--ink); }
+
+.intro__submit {
+  margin-top: 1.5rem;
+  padding: 0.55rem 1.4rem 0.6rem;
+  font-size: var(--step-0);
+  font-weight: 500;
+  line-height: 1.2;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  transition: transform 120ms ease-out, background-color 120ms ease-out;
+}
+.intro__submit:active { transform: scale(0.97); background: rgba(28, 35, 51, 0.06); }
+
+.intro__feedback {
+  min-height: 1.5em;
+  margin-top: 1rem;
+  font-style: italic;
+  font-size: var(--step-0);
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.intro__paper { display: none; z-index: 1; }
+.intro__rain { z-index: 2; }
+.intro.is-wet .intro__paper { display: block; }

@@ -1,0 +1,23 @@
+rules_version = '2';
+
+// Paste this into Firebase console → Firestore Database → Rules → Publish.
+// The website can ADD answers, but nobody (including the website) can
+// read, change or delete them. You read them yourself in the console.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /responses/{id} {
+      allow create: if request.resource.data.keys().hasOnly(
+                         ['scene', 'question', 'answer', 'correct', 'attempt', 'session', 'at'])
+                    && request.resource.data.answer is string
+                    && request.resource.data.answer.size() <= 500
+                    && request.resource.data.at == request.time;
+      allow read, update, delete: if false;
+    }
+
+    // everything else is closed
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
