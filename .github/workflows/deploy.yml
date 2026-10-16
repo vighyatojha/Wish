@@ -6,6 +6,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Safety net: if Pages is still set to "Deploy from a branch", GitHub also
+  # publishes the raw source folder on every push. Run again after it, so the
+  # finished site is always the one that ends up live.
+  workflow_run:
+    workflows: ["pages build and deployment"]
+    types: [completed]
 
 permissions:
   contents: read
