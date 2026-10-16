@@ -123,6 +123,11 @@ export function Sunrise({ flying, entered }: Props) {
   });
   const [arrived, setArrived] = useState(false);
   const [noValley, setNoValley] = useState(false);
+  // the valley picture is loaded and drawable (or we fell back to the still)
+  const [pictureReady, setPictureReady] = useState(false);
+  // the 3D meadow only renders every frame once she starts scrolling
+  const [stumpRunning, setStumpRunning] = useState(false);
+  const stumpLayer = useRef<HTMLDivElement>(null);
   const [noFog, setNoFog] = useState(false);
 
   // GSAP animates these numbers; the frame loop draws from them.
@@ -163,9 +168,14 @@ export function Sunrise({ flying, entered }: Props) {
 
     void Valley.create(valleyCanvas.current!, PICTURE).then((v) => {
       if (cancelled) return v?.destroy();
-      if (!v) return setNoValley(true);
+      if (!v) {
+        setNoValley(true);
+        setPictureReady(true);
+        return;
+      }
       valley = v;
       valley.resize(W, H);
+      setPictureReady(true);
     });
 
     let last = 0, lastTravel = 0, lastZoom = -1, lastMap = '';
@@ -230,6 +240,9 @@ export function Sunrise({ flying, entered }: Props) {
         tr.mark!.setAttribute('transform', `translate(${ex.toFixed(1)},${ey.toFixed(1)}) scale(${cam.mark.toFixed(3)})`);
       }
 
+      // the 3D meadow stays invisible until the camera starts gliding down to it
+      if (stumpLayer.current) stumpLayer.current.style.opacity = clamp(stump.arrive * 4).toFixed(3);
+
       // the map sits on the stump's sawn top
       stump.day = cam.day;
       const m = mapRef.current;
@@ -261,8 +274,14 @@ export function Sunrise({ flying, entered }: Props) {
   useGSAP(
     () => {
       if (!flying) return;
-      void loadStump(); // start downloading the 3D stump while the fog clears
-      wind.current = createWindSound();
+      void loadStump(); // make sure the 3D meadow is on its way
+      wind.current ??= createWindSound();
+      // The fog only starts to clear once the valley picture is ready.
+      // Until then she sees deep, slowly glowing fog, never a black screen.
+      if (!pictureReady) {
+        gsap.to(cam, { light: 0.35, duration: 6, ease: ease.scenery });
+        return;
+      }
       const tl = gsap.timeline({
         onComplete: () => {
           wind.current?.stop(1.5);
@@ -272,7 +291,7 @@ export function Sunrise({ flying, entered }: Props) {
       });
       tl
         // the storm passes: grey fog starts to glow as the sun burns through
-        .to(cam, { light: 1, duration: 7, ease: ease.scenery }, 0)
+        .to(cam, { light: 1, duration: 7, ease: ease.scenery, overwrite: 'auto' }, 0)
         // deep fog, swirling, the camera only creeping forward
         .to(cam, { travel: 0.6, duration: 5, ease: ease.scenery }, 0)
         // the slow flight: sheets of fog swell and drift past
@@ -285,7 +304,7 @@ export function Sunrise({ flying, entered }: Props) {
         .call(startAmbient, [], 10.5);
       if (prefersReducedMotion()) tl.timeScale(2);
     },
-    { dependencies: [flying] },
+    { dependencies: [flying, pictureReady] },
   );
 
   function startAmbient() {
@@ -326,7 +345,10 @@ export function Sunrise({ flying, entered }: Props) {
           start: 'top top',
           end: 'bottom bottom',
           scrub: reduced ? true : 1,
-          onUpdate: (self) => { scrollingForward.current = self.direction >= 0; },
+          onUpdate: (self) => {
+            scrollingForward.current = self.direction >= 0;
+            if (self.progress > 0.001) setStumpRunning(true);
+          },
         },
       });
 
@@ -395,7 +417,7 @@ export function Sunrise({ flying, entered }: Props) {
         <div ref={track} className="sunrise__track">
           <div className="sunrise__stage">
             <div className="layer" aria-hidden="true">
-              <img ref={still} className="layer sunrise__still" src={valleyUrl} alt="" hidden={!noValley}
+              <img ref={still} className="layer sunrise__still" src={valleyUrl} alt=""
                 style={{ objectPosition: `${PICTURE_FOCUS[0] * 100}% ${PICTURE_FOCUS[1] * 100}%` }} />
               <canvas ref={valleyCanvas} className="layer" hidden={noValley} />
               <canvas ref={birdsCanvas} className="layer" />
@@ -424,10 +446,13 @@ export function Sunrise({ flying, entered }: Props) {
               </svg>
             </div>
 
-            {live && (
-              <Suspense fallback={null}>
-                <StumpScene state={stump} />
-              </Suspense>
+            {/* mounted during the fog flight so its setup happens out of sight */}
+            {flying && (
+              <div ref={stumpLayer} className="layer" style={{ opacity: 0 }}>
+                <Suspense fallback={null}>
+                  <StumpScene state={stump} running={stumpRunning} />
+                </Suspense>
+              </div>
             )}
 
             <TreasureMap ref={mapRef} messages={copy.messages} initial={content.name.charAt(0)} />

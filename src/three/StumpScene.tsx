@@ -151,9 +151,12 @@ function Scene({ state }: { state: StumpState }) {
   );
 }
 
-export default function StumpScene({ state }: { state: StumpState }) {
+// running = false: draw once (to build everything and compile the shaders
+// while it's hidden), then wait. true: draw every frame.
+export default function StumpScene({ state, running }: { state: StumpState; running: boolean }) {
   return (
     <Canvas
+      frameloop={running ? 'always' : 'demand'}
       className="layer"
       style={{ pointerEvents: 'none' }}
       dpr={[1, 1.75]}
