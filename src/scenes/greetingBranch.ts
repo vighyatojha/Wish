@@ -22,7 +22,7 @@ function sample(segs: [P, P, P, P][], steps = 28): P[] {
 }
 
 /** A tapering ribbon along a centre line, shifted sideways by `shift` (× width). */
-function ribbon(pts: P[], width: (s: number) => number, shift = 0, scale = 1): string {
+function ribbon(pts: P[], width: (s: number, p: P) => number, shift = 0, scale = 1): string {
   const top: P[] = [], bot: P[] = [];
   pts.forEach((p, i) => {
     const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
@@ -31,7 +31,7 @@ function ribbon(pts: P[], width: (s: number) => number, shift = 0, scale = 1): s
     dx /= len;
     dy /= len;
     const n: P = [dy, -dx]; // points "up" the branch
-    const w = width(i / (pts.length - 1));
+    const w = width(i / (pts.length - 1), p);
     const c: P = [p[0] + n[0] * w * shift, p[1] + n[1] * w * shift];
     const h = (w * scale) / 2;
     top.push([c[0] + n[0] * h, c[1] + n[1] * h]);
@@ -41,11 +41,18 @@ function ribbon(pts: P[], width: (s: number) => number, shift = 0, scale = 1): s
   return `M${top.map(f).join(' L')} L${bot.reverse().map(f).join(' L')}Z`;
 }
 
+// The limb reaches far past the left edge (towards the trunk), so its
+// end never comes into view, even in the close-up on a wide screen.
 const MAIN = sample([
+  [[-560, 400], [-380, 330], [-180, 262], [-40, 230]],
   [[-40, 230], [60, 198], [140, 172], [210, 164]],
   [[210, 164], [270, 158], [340, 146], [408, 124]],
 ]);
-const mainWidth = (s: number) => 4 + 38 * Math.pow(1 - s, 1.35);
+// thickness by position: tapering to the tip, thickening towards the trunk
+const mainWidth = (_s: number, p: P) => {
+  const t = Math.min(1, Math.max(0, (408 - p[0]) / 448));
+  return 4 + 38 * Math.pow(t, 1.35) + Math.max(0, -40 - p[0]) * 0.06;
+};
 const TWIG_UP = sample([[[258, 159], [268, 142], [282, 128], [302, 114]]], 16);
 const TWIG_DOWN = sample([[[112, 181], [108, 192], [100, 202], [86, 212]]], 16);
 const TWIG_TIP = sample([[[352, 141], [362, 128], [370, 122], [382, 116]]], 12);
@@ -54,7 +61,7 @@ const twigWidth = (s: number) => 1.6 + 5 * (1 - s);
 function yAt(x: number): [number, number] {
   let best = MAIN[0], bi = 0;
   MAIN.forEach((p, i) => { if (Math.abs(p[0] - x) < Math.abs(best[0] - x)) { best = p; bi = i; } });
-  return [best[1], mainWidth(bi / (MAIN.length - 1))];
+  return [best[1], mainWidth(bi / (MAIN.length - 1), best)];
 }
 
 // bark lines: short strokes running along the limb
@@ -63,9 +70,9 @@ function barkLines(): string {
   const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   let d = '';
   for (let k = 0; k < 46; k++) {
-    const i = Math.floor(r() * (MAIN.length * 0.75));
+    const i = Math.floor(MAIN.length * (0.3 + r() * 0.5));
     const p = MAIN[i], q = MAIN[Math.min(MAIN.length - 1, i + 2)];
-    const w = mainWidth(i / (MAIN.length - 1));
+    const w = mainWidth(0, p);
     const off = (r() - 0.5) * w * 0.75;
     let dx = q[0] - p[0], dy = q[1] - p[1];
     const len = Math.hypot(dx, dy) || 1;
