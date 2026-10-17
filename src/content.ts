@@ -31,35 +31,40 @@ export const content = {
     letInMessage: 'Close enough. Come in.',
   },
 
-  // ── Page 2a: the little bird on the branch ──────────────────
-  // It lands once the valley has opened, before the scrolling starts.
-  greeting: {
-    // Each line starts on its own line in the speech bubble.
-    // The word "bell" is highlighted automatically.
-    lines: ['Hi!', 'How was the surprise?', 'Now tap the bell to move further.'],
-    bellLabel: 'Ring the bell',
-    // The fairies carry these on bunting, with her name (above) underneath.
-    banner: 'Happy Birthday',
-    // Shown under the bunting once it has settled.
-    continueHint: 'Tap anywhere to continue',
+  // ── Page 2: the bus stop ────────────────────────────────────
+  // After the fog, the rain stops, a cloud of butterflies sweeps past,
+  // and one lands on a tulip to talk to her.
+  butterfly: {
+    lines: ['How was the surprise?', 'Vese, picture abhi baki hai!'],
+    hint: '(pluck the flower to continue)',
+    tapLabel: 'Pluck the flower',
   },
 
-  // ── Page 2b: the animals with cards, around the valley ─────
-  // After the bunting, the camera visits one place after another.
-  // At each, a little animal pops up holding a rolled card; it opens
-  // into one of these messages. She taps to go on to the next.
-  // The sun moves across the sky as she goes: late morning →
-  // mid-afternoon. Golden hour, sunset and night come in later scenes.
-  // Keep each to a sentence or two so it fits on a phone.
-  // These are placeholders: replace them with your own words.
-  tour: {
-    cards: [
-      { animal: 'bunny', from: 'from the little Bunny', message: 'The rain’s over. This whole morning is yours.' },
-      { animal: 'fox', from: 'from the Fox by the farmhouse', message: 'Some people feel like sunrise. You’re one of them.' },
-      { animal: 'duckling', from: 'from the Duckling on the river', message: 'Thank you for every laugh, every long talk, and every time you showed up.' },
-      { animal: 'hedgehog', from: 'from the Hedgehog on the rock', message: 'You make ordinary days feel like little celebrations.' },
-      { animal: 'squirrel', from: 'from the Squirrel on the far bank', message: 'Stay a little longer. The sky has more to say after sunset.' },
-    ],
-    tapHint: 'Tap to continue',
+  // Tapping a bird in the sky (there is no hint that she can) shows this.
+  birds: {
+    title: 'Why white birds and black birds?',
+    meaning:
+      'The white ones are your bright days, the black ones your hard days. They fly together in the same sky, and both of them carried you here, to today.',
+    close: 'tap anywhere to close',
+  },
+
+  // One animal at a time steps off the bus with a scroll for her.
+  // The day turns to night as they go. These are placeholders:
+  // replace them with your own words (a sentence or two each).
+  animals: [
+    { animal: 'bunny', message: 'Bloom where you are planted, and keep growing towards the light.' },
+    { animal: 'fox', message: 'What lies within you is stronger than anything that stands before you.' },
+    { animal: 'duckling', message: 'Every sunset is a promise that a new dawn is on its way.' },
+    { animal: 'hedgehog', message: 'Do small things with great love; one day they become the big things.' },
+    { animal: 'squirrel', message: 'Stars can’t shine without darkness. So shine.' },
+  ],
+  noteHint: 'tap the note to close it',
+
+  // At the end, all the animals ask her one thing. Her answer is saved.
+  question: {
+    lead: 'Before you go anywhere…',
+    ask: 'Which flower do you like the most?',
+    options: ['Tulip', 'Lily', 'Lotus'],
+    thanks: 'Noted! Hold on, there’s more…',
   },
 } as const;

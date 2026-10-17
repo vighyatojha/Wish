@@ -3,20 +3,21 @@
 //  Only the scene on screen (plus the one being revealed under it)
 //  is mounted, so the phone never runs two heavy scenes at once.
 //
-//  While building, add ?scene=sunrise to the address to jump
-//  straight to page 2 (sound needs the first tap, so it's silent).
+//  While building, add ?scene=stop (or pluck, bus, animals, question)
+//  to the address to jump straight to page 2 (sound needs the first
+//  tap, so it's silent).
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { preloadStory } from './lib/preload';
 import { Intro } from './scenes/Intro';
-import { Sunrise } from './scenes/Sunrise';
+import { BusStop } from './scenes/BusStop';
 import { Gallery } from './scenes/Gallery';
 
 const skipTo = new URLSearchParams(location.search).get('scene');
 
 export function App() {
   if (skipTo === 'gallery') return <Gallery />;
-  const jump = skipTo === 'sunrise' || skipTo === 'tour';
+  const jump = ['stop', 'pluck', 'bus', 'animals', 'question'].includes(skipTo ?? '');
   const [showIntro, setShowIntro] = useState(!jump);
   const [showSunrise, setShowSunrise] = useState(jump);
   const [flying, setFlying] = useState(jump);
@@ -30,7 +31,7 @@ export function App() {
 
   return (
     <main>
-      {showSunrise && <Sunrise flying={flying} entered={sunriseInCharge} />}
+      {showSunrise && <BusStop flying={flying} entered={sunriseInCharge} />}
       {showIntro && (
         <Intro
           onRainStart={() => setShowSunrise(true)}

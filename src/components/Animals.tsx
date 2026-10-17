@@ -15,7 +15,7 @@ import { useId, type ReactNode } from 'react';
 export type AnimalKind = 'bunny' | 'fox' | 'hedgehog' | 'squirrel' | 'duckling';
 export const ANIMAL_FEET = [100, 192] as const;
 /** where the rolled card sits (local units), for growing the card out of it */
-export const CARD_ROLL = [100, 146] as const;
+export const CARD_ROLL = [100, 145] as const;
 
 const INK = '#5b3b29';
 const BODY = 'M100,112 C136,112 152,140 152,166 C152,186 136,194 100,194 C64,194 48,186 48,166 C48,140 64,112 100,112Z';
@@ -54,27 +54,38 @@ function Cheeks({ y, gap, url }: { y: number; gap: number; url: (n: string) => s
   );
 }
 
-/** the rolled card, and the paws (or wing tips) holding it */
-function HeldCard({ p, wings, url }: { p: Palette; wings?: boolean; url: (n: string) => string }) {
+/** the rolled-up scroll (about a third of the animal's height), and the paws holding it */
+export const SCROLL = { x0: 58, x1: 142, y: 145, r: 11 } as const;
+function HeldScroll({ p, wings, url }: { p: Palette; wings?: boolean; url: (n: string) => string }) {
   const paw = (x: number) =>
     wings ? (
-      <path d={`M${x - 12},${136} C${x - 2},${132} ${x + 10},${138} ${x + 10},${150} C${x + 4},${156} ${x - 8},${156} ${x - 14},${148}Z`}
+      <path d={`M${x - 12},${135} C${x - 2},${131} ${x + 10},${137} ${x + 10},${149} C${x + 4},${155} ${x - 8},${155} ${x - 14},${147}Z`}
         fill={p.light} stroke={INK} strokeWidth="1.8" strokeLinejoin="round" />
     ) : (
       <g>
-        <ellipse cx={x} cy="147" rx="9.5" ry="8.5" fill={p.light} stroke={INK} strokeWidth="1.8" />
-        <path d={`M${x - 3},141 l0,5 M${x + 3},141 l0,5`} stroke={INK} strokeWidth="1.1" strokeLinecap="round" opacity="0.6" />
+        <ellipse cx={x} cy="146" rx="9.5" ry="9" fill={p.light} stroke={INK} strokeWidth="1.8" />
+        <path d={`M${x - 3},139 l0,5 M${x + 3},139 l0,5`} stroke={INK} strokeWidth="1.1" strokeLinecap="round" opacity="0.6" />
       </g>
     );
+  const { y, r } = SCROLL;
   return (
     <g data-part="arms">
-      <rect x="68" y="137" width="64" height="18" rx="9" fill={url('paper')} stroke={INK} strokeWidth="1.8" />
-      <ellipse cx="70" cy="146" rx="4.5" ry="9" fill="#fff8e8" stroke={INK} strokeWidth="1.4" />
-      <path d="M70,142 a2.5,3 0 1 1 -0.1,0" fill="none" stroke="#b89a6a" strokeWidth="1" />
-      <rect x="95" y="136.5" width="10" height="19" fill="#c0392b" stroke="#7d1a12" strokeWidth="1" />
-      <path d="M100,155 l-5,9 l4,-1 l1,3 M100,155 l5,9 l-4,-1 l-1,3" fill="#c0392b" stroke="#7d1a12" strokeWidth="1" strokeLinejoin="round" />
-      {paw(80)}
-      {paw(120)}
+      <g data-part="scroll">
+        {/* wooden roller ends */}
+        <rect x="56" y={y - 3} width="88" height="6" rx="3" fill="#6b4220" />
+        <ellipse cx="60" cy={y} rx="5" ry="8.5" fill={url('wood')} stroke={INK} strokeWidth="1.4" />
+        <ellipse cx="140" cy={y} rx="5" ry="8.5" fill={url('wood')} stroke={INK} strokeWidth="1.4" />
+        {/* the rolled parchment */}
+        <rect x="64" y={y - r} width="72" height={r * 2} rx="4" fill={url('paper')} stroke={INK} strokeWidth="1.8" />
+        <path d={`M66,${y - r + 4} L134,${y - r + 4}`} stroke="#fffaf0" strokeWidth="2.4" opacity="0.7" strokeLinecap="round" />
+        <path d={`M66,${y + r - 4} L134,${y + r - 4}`} stroke="#b89262" strokeWidth="1.4" opacity="0.6" strokeLinecap="round" />
+        {/* a red ribbon and a gold seal */}
+        <rect x="96" y={y - r - 0.5} width="8" height={r * 2 + 1} fill="#b8322a" stroke="#6d1a12" strokeWidth="1" />
+        <circle cx="100" cy={y} r="5.5" fill="#d9a13a" stroke="#7a5214" strokeWidth="1" />
+        <path d={`M98,${y - 1.5} l2,3 l2,-3`} fill="none" stroke="#7a5214" strokeWidth="1" />
+      </g>
+      {paw(78)}
+      {paw(122)}
     </g>
   );
 }
@@ -142,9 +153,14 @@ export function AnimalArt({ kind, grain }: { kind: AnimalKind; grain: string }) 
         <stop offset="1" stopColor="#f39aa3" stopOpacity="0" />
       </radialGradient>
       <linearGradient id={id('paper')} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stopColor="#fffaf0" />
-        <stop offset="1" stopColor="#e6cf9f" />
+        <stop offset="0" stopColor="#fbf0d4" />
+        <stop offset="0.5" stopColor="#f0dcb0" />
+        <stop offset="1" stopColor="#c9a46c" />
       </linearGradient>
+      <radialGradient id={id('wood')} cx="0.35" cy="0.35" r="0.8">
+        <stop offset="0" stopColor="#b07a42" />
+        <stop offset="1" stopColor="#5a3518" />
+      </radialGradient>
     </defs>
   );
 
@@ -286,10 +302,10 @@ export function AnimalArt({ kind, grain }: { kind: AnimalKind; grain: string }) 
     <g data-part="body">
       {defs}
       {back}
-      {feet}
+      {(feet as ReactNode[]).map((f, i) => <g key={i} data-part={i ? 'foot-r' : 'foot-l'}>{f}</g>)}
       {body}
       <g data-part="head" data-x="100" data-y={kind === 'hedgehog' ? 132 : 120}>{head}</g>
-      <HeldCard p={p} wings={kind === 'duckling'} url={url} />
+      <HeldScroll p={p} wings={kind === 'duckling'} url={url} />
     </g>
   );
 }
@@ -303,18 +319,25 @@ export interface AnimalPose {
   tail: number;   // tail sway (deg)
   blink: number;  // 1 open, 0 shut
   offer: number;  // 0 → 1 raises the card to give it
+  footL?: number; // lifts a foot (units), for walking
+  footR?: number;
 }
 
 type Pivoted = { el: SVGGElement; x: number; y: number; rest: number };
 
 /** Moves one drawn animal. Give it the <g> that wraps an <AnimalArt>. */
 export class AnimalRig {
+  /** hide the scroll in its paws (when it has been handed over) */
+  showScroll(v: boolean) { this.scroll.style.visibility = v ? 'visible' : 'hidden'; }
+
   private body: SVGGElement;
   private head: Pivoted | null;
   private earL: Pivoted | null;
   private earR: Pivoted | null;
   private tail: Pivoted | null;
   private arms: SVGGElement;
+  private scroll: SVGGElement;
+  private feet: SVGGElement[];
   private eyes: Pivoted[];
   private last = '';
 
@@ -324,6 +347,8 @@ export class AnimalRig {
     const q = (p: string) => root.querySelector<SVGGElement>(`[data-part="${p}"]`);
     this.body = q('body')!;
     this.arms = q('arms')!;
+    this.scroll = q('scroll')!;
+    this.feet = [q('foot-l')!, q('foot-r')!];
     this.head = pivot(q('head'));
     this.earL = pivot(q('ear-l'));
     this.earR = pivot(q('ear-r'));
@@ -332,7 +357,7 @@ export class AnimalRig {
   }
 
   pose(p: AnimalPose) {
-    const key = [p.squash, p.lean, p.head, p.earL, p.earR, p.tail, p.blink, p.offer].map((v) => v.toFixed(2)).join('|');
+    const key = [p.squash, p.lean, p.head, p.earL, p.earR, p.tail, p.blink, p.offer, p.footL ?? 0, p.footR ?? 0].map((v) => v.toFixed(2)).join('|');
     if (key === this.last) return;
     this.last = key;
     const [fx, fy] = ANIMAL_FEET;
@@ -342,6 +367,8 @@ export class AnimalRig {
     rot(this.earL, p.earL);
     rot(this.earR, -p.earR);
     rot(this.tail, p.tail);
+    this.feet[0].setAttribute('transform', `translate(0 ${(-(p.footL ?? 0)).toFixed(2)})`);
+    this.feet[1].setAttribute('transform', `translate(0 ${(-(p.footR ?? 0)).toFixed(2)})`);
     const o = p.offer;
     this.arms.setAttribute('transform', `translate(0 ${(-o * 16).toFixed(2)}) translate(100 146) scale(${(1 + o * 0.08).toFixed(3)}) rotate(${(-o * 6).toFixed(2)}) translate(-100 -146)`);
     const b = Math.max(0.08, p.blink);

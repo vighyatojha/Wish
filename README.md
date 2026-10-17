@@ -1,7 +1,7 @@
 # Birthday site
 
-A scroll-and-touch birthday story for Android phones and tablets, built with
-**React + TypeScript + Vite** and **GSAP + ScrollTrigger**.
+A touch-driven birthday story for Android phones and tablets, built with
+**React + TypeScript + Vite** and **GSAP**.
 
 ## What's built so far
 
@@ -10,27 +10,24 @@ portrait, keeps the screen awake). The greeting and question write themselves in
 word by word. A wrong answer gets a small shake and a hint. The right answer starts
 the rain: drops wet the paper, the ink runs, and the sheet falls apart.
 
-**Page 2, the valley and the treasure trail.** Deep storm-grey fog glows as the sun
-burns through, then the camera flies on its own into the valley, now in late-morning
-light (clouds drift, mist creeps, the river glitters, birds fly across). A small card
-tells her how to scroll. Then, scrolling:
-
-1. a treasure trail draws itself across the valley, a compass spins in, an X marks the spot;
-2. the camera glides down to a grassy hilltop, the valley behind softens like a lens
-   focusing close, and a 3D tree stump rises into the foreground, standing in a
-   meadow of swaying grass with wildflowers and stones;
-3. a thick old treasure map unrolls on the stump (with a paper rustle) and the first
-   message writes itself in, letter by letter;
-4. each next message is written in turn while the sun moves across the sky, from
-   late morning to mid-afternoon. Shadows turn with it and the grass glows when the
-   sun is behind it. Golden hour, sunset and night are saved for the next scenes.
+**Page 2, the bus stop.** Through the fog: a country bus stop in the rain. The rain
+stops and the day clears; a tulip opens in the grass and a swarm of butterflies sweeps
+across the screen. One butterfly lands on the tulip and, in close-up, says hello. She
+plucks the tulip: it flies at the screen and bursts into petals, and the garden comes
+back with butterflies about the stop and white and black birds in the sky (tapping a
+bird, which nothing hints at, explains them). The bus arrives with its own sound, the
+brakes sigh, and the door folds open with a hiss of air. Five animals step off one at
+a time in stop-motion, walk up to her and hand over a scroll that unrolls in the middle
+of the screen; she taps it closed and the animal dissolves into golden dust. The day
+turns to night as they go (golden hour, sunset, blue hour, moonlit night, with the bus
+windows and the vending machine glowing), fireflies come out, and finally the animals
+ask her which flower she likes most (her answer is saved).
 
 ## Change the words
 
-Everything she reads is in **`src/content.ts`**: her name, the question, accepted
-answers, hints, the scroll instruction and the treasure-map messages. Add or remove
-messages freely: the scroll length, the Roman numerals and the day's progression all
-adjust themselves.
+Everything she reads is in **`src/content.ts`**: her name, the question and answers,
+the butterfly's words, the birds' meaning, the five animals' messages and the flower
+question.
 
 ## Just want to see it?
 
@@ -63,8 +60,9 @@ Double-clicking `index.html` no longer works: React sites have to be built or ru
 through `npm run dev`.
 
 Handy while building:
-- `?scene=sunrise` at the end of the address jumps straight to page 2 (silent,
-  since sound needs the first tap).
+- `?scene=stop`, `?scene=pluck`, `?scene=bus`, `?scene=animals` or `?scene=question`
+  at the end of the address jumps straight to that part of page 2 (silent, since sound
+  needs the first tap). `?scene=gallery` shows all the characters.
 - In Chrome DevTools, press Ctrl+Shift+M for a phone-sized screen.
 
 ## Put it online (GitHub Pages)
@@ -99,23 +97,23 @@ src/
   App.tsx              which scene is on screen
   scenes/
     Intro.tsx          page 1: question, rain, wet paper
-    Sunrise.tsx        page 2: fog flight, living valley, the scroll story
+    BusStop.tsx        page 2: the whole bus-stop story, step by step
   components/
-    TreasureMap.tsx    the parchment map (paper, compass, seal, drop caps)
-  three/
-    StumpScene.tsx     the 3D scene: camera sweep, sunlight that follows the sun, shadows
-    meadow.ts          hillside, grass (custom shader), wildflowers, stones
-    stumpAssets.ts     stump shape, bark and ring textures (all made in code)
+    Garden.tsx         the talking butterfly and the tulip (SVG)
+    Animals.tsx        bunny, fox, duckling, hedgehog, squirrel with their scrolls (SVG)
+    Note.tsx           the big scroll: wooden rollers, parchment, flowing script
   lib/
-    motion.ts          GSAP + ScrollTrigger + SplitText setup, shared easing rules
-    paper.ts           wet paper effect (WebGL)
-    rain.ts            rain particles + wetness map (canvas)
+    stage.ts           the living bus stop: rain, clouds, grass, day → night, lights,
+                       moon and stars, the bus film and its door (WebGL)
+    life.ts            butterflies, birds, fireflies, petals, golden dust (canvas)
     fog.ts             fog flight (WebGL)
-    valley.ts          living valley: clouds, mist, river, sun, time of day, focus blur (WebGL)
-    birds.ts           flocks of birds (canvas)
-    audio.ts           rain and wind sounds (generated live)
-    ink.ts, noise.ts, gl.ts, device.ts, firebase.ts   helpers
-  assets/              valley picture, its sky/mist/river masks, birdsong
+    rain.ts            rain particles + wetness map (canvas)
+    paper.ts           wet paper effect (WebGL)
+    audio.ts           rain, wind, bus brakes and door, steps, shimmer, crickets (generated live)
+    motion.ts          GSAP setup, shared easing rules
+    camera.ts, ink.ts, noise.ts, gl.ts, device.ts, firebase.ts   helpers
+  assets/              bus-stop pictures (empty, with the bus) and their masks,
+                       the bus film, birdsong
 ```
 
 **Motion rules used everywhere** (`src/lib/motion.ts`): entering things ease out,
