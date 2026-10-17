@@ -105,6 +105,7 @@ function sceneLight(night: number, rain: number) {
   return { values, rim: `rgb(${rim.join(',')})`, shadow: 0.42 - Math.min(1, night / 4) * 0.2 };
 }
 const skip = new URLSearchParams(location.search).get('scene');
+const showDebug = new URLSearchParams(location.search).has('debug');
 
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -170,6 +171,7 @@ export function BusStop({ flying, entered }: Props) {
   const note = useRef<NoteHandle>(null);
   const lifeRef = useRef<Life | null>(null);
   const stageRef = useRef<Stage | null>(null);
+  const debug = useRef<HTMLPreElement>(null);
   const mapRef = useRef<{ map: (uv: Vec2) => Vec2; ppp: number; W: number; H: number }>({ map: (u) => u, ppp: 1, W: 1, H: 1 });
   const alive = useRef(true);
   const waiters = useRef<{ pluck?: () => void; note?: () => void; answer?: (a: string) => void; go?: () => void }>({});
@@ -241,6 +243,7 @@ export function BusStop({ flying, entered }: Props) {
       if (still.current) {
         const pos = (i: 0 | 1) => (base.span[i] >= 1 ? 50 : (base.offset[i] / (1 - base.span[i])) * 100);
         still.current.style.objectPosition = `${pos(0)}% ${pos(1)}%`;
+        if (film.current) film.current.style.objectPosition = still.current.style.objectPosition;
       }
     };
     resize();
@@ -250,7 +253,13 @@ export function BusStop({ flying, entered }: Props) {
       .then((s) => {
         if (cancelled) return s?.destroy();
         if (!s) setNoStage(true);
-        else { stage = s; stageRef.current = s; stage.resize(W, H); }
+        else {
+          stage = s;
+          stageRef.current = s;
+          stage.resize(W, H);
+          // (for testing the fallback: ?stagefail)
+          if (new URLSearchParams(location.search).has('stagefail')) s.broken = 'simulated for testing';
+        }
         setPictureReady(true);
       });
 
@@ -269,6 +278,25 @@ export function BusStop({ flying, entered }: Props) {
       }
     };
 
+    let brokenReason = '';
+    // ── ?debug: a small panel showing what the graphics are doing ──
+    let debugTick = 0;
+    const debugPanel = debug.current;
+    const writeDebug = (fps: number) => {
+      if (!debugPanel) return;
+      const v = film.current!;
+      const st = stage?.stats;
+      debugPanel.textContent = [
+        `renderer: ${st?.renderer ?? '—'}`,
+        `background: ${stage ? 'animated (WebGL2)' : `still pictures${brokenReason ? ` — ${brokenReason}` : ''}`}`,
+        `self-check pixels: ${st?.probe ?? '—'}  black: ${st?.blackProbes ?? 0}  gl error: ${st?.glError ?? 0}`,
+        `fps: ${fps.toFixed(0)}  quality: ${QUALITY[quality]}  size: ${W}×${H} @${window.devicePixelRatio}`,
+        `story: night ${S.night.toFixed(2)} rain ${S.rain.toFixed(2)} haze ${S.haze.toFixed(2)} weights ${S.weights.map((x) => x.toFixed(2)).join('/')}`,
+        `film: ready ${v.readyState} t ${v.currentTime.toFixed(1)} frame ${stage?.videoHasFrame ?? false}`,
+      ].join('\n');
+    };
+    let fpsAcc = 0, fpsN = 0;
+
     let last = 0;
     const frame = (now: number) => {
       const rawDt = last ? (now - last) / 1000 : 0.016;
@@ -276,6 +304,7 @@ export function BusStop({ flying, entered }: Props) {
       last = now;
       const time = now / 1000;
       if (rawDt < 1) adapt(rawDt);
+      if (debugPanel) { fpsAcc += rawDt; fpsN++; if (++debugTick % 20 === 0) { writeDebug(fpsN / Math.max(0.001, fpsAcc)); fpsAcc = 0; fpsN = 0; } }
 
       // ── camera ──
       const z = S.z;
@@ -391,6 +420,13 @@ export function BusStop({ flying, entered }: Props) {
       // ── the background ──
       let focus: { x: number; y: number; sharp: number; soft: number } | undefined;
       if (S.focus > 0.001) focus = { x: headScreen[0], y: headScreen[1] - 0.03, sharp: 0.16, soft: 0.5 };
+      if (stage && stage.broken) {
+        console.warn('[stage] switching to the still pictures:', stage.broken);
+        brokenReason = stage.broken;
+        stage = null;
+        stageRef.current = null;
+        setNoStage(true);
+      }
       if (stage) {
         stage.render({
           time, layout, zoom: z, zoomCenter: center, blur: S.blur, focus,
@@ -399,6 +435,9 @@ export function BusStop({ flying, entered }: Props) {
       } else if (still.current) {
         const s = still.current;
         s.style.visibility = 'visible';
+        const fv = film.current!;
+        fv.classList.add('is-shown');
+        fv.style.opacity = S.weights[1].toFixed(3);
         const src = S.weights[2] > 0.5 ? busUrl : emptyUrl;
         if (!s.src.endsWith(src)) s.src = src;
         const tx = (0.5 + ((base.offset[0] - layout.offset[0]) / base.span[0] - 0.5) * z) * W;
@@ -684,7 +723,18 @@ export function BusStop({ flying, entered }: Props) {
     }).then(live);
     // if this browser can't show the film, the bus simply fades in at the stop
     await wait(0.4);
-    if (stageRef.current && !stageRef.current.videoHasFrame) {
+    if (!stageRef.current) {
+      // still pictures: the film itself is shown on top while it plays
+      gsap.to(S.weights, { 0: 0, 1: 1, duration: 0.35, ease: 'none' });
+      await wait(Math.max(0, 4.3 - v.currentTime));
+      playAirRelease(1.4, 0.38);
+      await wait(Math.max(0, 6.2 - v.currentTime));
+      gsap.to(S.weights, { 1: 0, 2: 1, duration: 0.5, ease: 'none' });
+      gsap.to(v, { volume: 0, duration: 0.9, ease: 'sine.in', onComplete: () => v.pause() });
+      await wait(0.6);
+      return;
+    }
+    if (!stageRef.current.videoHasFrame) {
       await wait(1.2);
       if (!stageRef.current.videoHasFrame) {
         v.pause();
@@ -1018,6 +1068,7 @@ export function BusStop({ flying, entered }: Props) {
           {ui.answer && <p className="stop__thanks">{content.question.thanks}</p>}
         </div>
       )}
+      {showDebug && <pre ref={debug} className="stop__debug" />}
     </section>
   );
 }

@@ -313,6 +313,12 @@ export class Stage {
   private lastVideoTime = -1;
   /** true once the bus film has given us a real frame */
   videoHasFrame = false;
+  /** set when drawing has failed (context lost, or the picture comes out black) */
+  broken = '';
+  /** for the ?debug panel */
+  stats = { renderer: '', glError: 0, probe: '', frames: 0, blackProbes: 0 };
+  private probeBuf = new Uint8Array(4 * 3);
+  private lastProbe = 0;
 
   /** Returns null when the phone has no WebGL2 (the still picture is shown instead). */
   static async create(canvas: HTMLCanvasElement, pics: StagePictures, video: HTMLVideoElement, maxDpr = 1.5): Promise<Stage | null> {
@@ -335,6 +341,9 @@ export class Stage {
     private video: HTMLVideoElement,
     private maxDpr: number,
   ) {
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    this.stats.renderer = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); this.broken = 'graphics context lost'; });
     this.program = createProgram(gl, FRAG);
     gl.useProgram(this.program);
     this.u = uniforms(gl, this.program, [
@@ -421,6 +430,32 @@ export class Stage {
     gl.uniform1f(u.uCloud, f.cloud);
     gl.uniform1f(u.uLampOn, f.lamp);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    // self-check, about once a second: read three pixels of what was just drawn.
+    // In daylight the picture is never pure black; if it is, drawing has failed
+    // on this device, and the scene switches to the still pictures.
+    this.stats.frames++;
+    const now = performance.now();
+    if (now - this.lastProbe > 1000) {
+      this.lastProbe = now;
+      const err = gl.getError();
+      if (err) this.stats.glError = err;
+      const w2 = this.canvas.width, h2 = this.canvas.height;
+      const pts = [[0.5, 0.35], [0.25, 0.6], [0.75, 0.8]];
+      let sum = 0;
+      const out: string[] = [];
+      pts.forEach(([x, y], k) => {
+        gl.readPixels(Math.floor(w2 * x), Math.floor(h2 * (1 - y)), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, this.probeBuf.subarray(k * 4, k * 4 + 4));
+        const b = this.probeBuf.subarray(k * 4, k * 4 + 3);
+        sum += b[0] + b[1] + b[2];
+        out.push(`${b[0]},${b[1]},${b[2]}`);
+      });
+      this.stats.probe = out.join(' · ');
+      if (sum < 6 && f.night < 3.2 && f.blur < 3) {
+        this.stats.blackProbes++;
+        if (this.stats.blackProbes >= 2) this.broken = `picture came out black (gl error ${err || 'none'})`;
+      } else this.stats.blackProbes = 0;
+    }
   }
 
   destroy(): void {

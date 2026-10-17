@@ -3,9 +3,17 @@
    ───────────────────────────────────────────────────────────── */
 .stop { z-index: 1; background: #8d949b; overflow: hidden; }
 .stop__still { object-fit: cover; }
-/* the bus film: a real, full-size video behind the picture (browsers skip
-   decoding videos that are hidden, which would leave the picture black) */
-.stop__film { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+/* the bus film: normally a tiny element whose frames are painted into the
+   picture; only if the animated picture can't run is it shown full size */
+.stop__film { position: absolute; right: 0; bottom: 0; width: 4px; height: 4px; opacity: 0.02; pointer-events: none; }
+.stop__film.is-shown { inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; z-index: 1; }
+
+/* ?debug */
+.stop__debug {
+  position: absolute; left: 8px; top: 8px; z-index: 50; margin: 0; max-width: calc(100vw - 16px);
+  padding: 8px 10px; font: 11px/1.45 ui-monospace, monospace; color: #d6ffd6; white-space: pre-wrap;
+  background: rgba(0, 0, 0, 0.72); border-radius: 6px; pointer-events: none;
+}
 .stop__cast { overflow: visible; pointer-events: none; }
 .stop__rain { pointer-events: none; }
 
