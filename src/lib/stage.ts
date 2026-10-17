@@ -232,17 +232,13 @@ void main() {
     float r = length(d);
     float R = uMoonR;
     float clear = 1.0 - smoothstep(0.55, 0.85, luma(orig)) * 0.75;
-    if (r < R * 1.05) {
-      vec2 q = d / R;                                  // −1 … 1 across the disk
-      float z = sqrt(max(0.0, 1.0 - dot(q, q)));
-      vec2 sph = q * (0.82 + 0.18 * z);                // wrap the surface round the ball
-      float alb = texture(uMoonTex, sph * 0.5 + 0.5).r;
-      vec3 surf = vec3(alb) * vec3(1.0, 0.985, 0.94) * 0.94;
-      surf *= 0.72 + 0.28 * z;                          // darker towards the edge (limb)
-      float disk = 1.0 - smoothstep(R * 0.985, R * 1.02, r);
-      col = mix(col, surf, disk * moon * mix(1.0, clear, 0.7) * sky);
+    // her moon picture (with its own soft glow): the disk fills 280 of its 360-pixel half-width
+    vec2 mq = d / (R * (360.0 / 280.0)) * 0.5 + 0.5;
+    if (mq.x > 0.0 && mq.x < 1.0 && mq.y > 0.0 && mq.y < 1.0) {
+      vec4 M = texture(uMoonTex, mq);
+      col = mix(col, M.rgb, M.a * moon * mix(1.0, clear, 0.6) * sky);
     }
-    float halo = exp(-max(0.0, r - R) * 16.0) * 0.32 + exp(-r * 4.5) * 0.1;
+    float halo = exp(-max(0.0, r - R * 1.25) * 14.0) * 0.12 + exp(-r * 4.5) * 0.08;
     col += vec3(0.62, 0.68, 0.85) * halo * moon * sky;
     // the edges of nearby clouds catch the moonlight
     float cl = smoothstep(0.45, 0.8, luma(orig)) * sky;
@@ -315,6 +311,8 @@ export class Stage {
   private textures: WebGLTexture[];
   private videoTex: WebGLTexture;
   private lastVideoTime = -1;
+  /** true once the bus film has given us a real frame */
+  videoHasFrame = false;
 
   /** Returns null when the phone has no WebGL2 (the still picture is shown instead). */
   static async create(canvas: HTMLCanvasElement, pics: StagePictures, video: HTMLVideoElement, maxDpr = 1.5): Promise<Stage | null> {
@@ -398,9 +396,15 @@ export class Stage {
       this.lastVideoTime = video.currentTime;
       gl.activeTexture(gl.TEXTURE2);
       gl.bindTexture(gl.TEXTURE_2D, this.videoTex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+      try {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+        if (video.videoWidth > 0) this.videoHasFrame = true;
+      } catch { /* not decodable yet */ }
     }
-    gl.uniform3f(u.uW, f.weights[0], f.weights[1], f.weights[2]);
+    // until the film has a real frame, show the empty stop in its place (never black)
+    const w = f.weights;
+    if (this.videoHasFrame) gl.uniform3f(u.uW, w[0], w[1], w[2]);
+    else gl.uniform3f(u.uW, w[0] + w[1], 0, w[2]);
     gl.uniform2f(u.uOffset, f.layout.offset[0], f.layout.offset[1]);
     gl.uniform2f(u.uSpan, f.layout.span[0], f.layout.span[1]);
     gl.uniform2f(u.uZoomC, f.zoomCenter[0], f.zoomCenter[1]);

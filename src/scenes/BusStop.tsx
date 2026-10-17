@@ -169,6 +169,7 @@ export function BusStop({ flying, entered }: Props) {
   const flash = useRef<HTMLDivElement>(null);
   const note = useRef<NoteHandle>(null);
   const lifeRef = useRef<Life | null>(null);
+  const stageRef = useRef<Stage | null>(null);
   const mapRef = useRef<{ map: (uv: Vec2) => Vec2; ppp: number; W: number; H: number }>({ map: (u) => u, ppp: 1, W: 1, H: 1 });
   const alive = useRef(true);
   const waiters = useRef<{ pluck?: () => void; note?: () => void; answer?: (a: string) => void; go?: () => void }>({});
@@ -249,7 +250,7 @@ export function BusStop({ flying, entered }: Props) {
       .then((s) => {
         if (cancelled) return s?.destroy();
         if (!s) setNoStage(true);
-        else { stage = s; stage.resize(W, H); }
+        else { stage = s; stageRef.current = s; stage.resize(W, H); }
         setPictureReady(true);
       });
 
@@ -681,6 +682,18 @@ export function BusStop({ flying, entered }: Props) {
       if (anyV.requestVideoFrameCallback) anyV.requestVideoFrameCallback(() => r());
       else setTimeout(r, 150);
     }).then(live);
+    // if this browser can't show the film, the bus simply fades in at the stop
+    await wait(0.4);
+    if (stageRef.current && !stageRef.current.videoHasFrame) {
+      await wait(1.2);
+      if (!stageRef.current.videoHasFrame) {
+        v.pause();
+        playAirRelease(1.4, 0.38);
+        await play(gsap.to(S.weights, { 0: 0, 1: 0, 2: 1, duration: 1.4, ease: 'sine.inOut' }));
+        await wait(0.6);
+        return;
+      }
+    }
     gsap.to(S, { cloud: 0, duration: 0.3 });
     gsap.to(S.weights, { 0: 0, 1: 1, duration: 0.35, ease: 'none' });
     // the brakes sigh as it stops

@@ -3,7 +3,9 @@
    ───────────────────────────────────────────────────────────── */
 .stop { z-index: 1; background: #8d949b; overflow: hidden; }
 .stop__still { object-fit: cover; }
-.stop__film { position: absolute; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+/* the bus film: a real, full-size video behind the picture (browsers skip
+   decoding videos that are hidden, which would leave the picture black) */
+.stop__film { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 .stop__cast { overflow: visible; pointer-events: none; }
 .stop__rain { pointer-events: none; }
 
