@@ -31,27 +31,32 @@ import {
 import { saveResponse } from '../lib/firebase';
 import { Fog } from '../lib/fog';
 import { Rain } from '../lib/rain';
-import { Stage, DOOR } from '../lib/stage';
+import { Stage, DOOR, MOON, MOON_R } from '../lib/stage';
 import { Life } from '../lib/life';
+import { Banner, type BannerBird } from '../lib/bunting';
+import { dissolveNoise } from '../lib/dissolve';
 import { coverLayout, toScreen, toPicture, type CoverLayout, type Vec2 } from '../lib/camera';
 import { GrainPattern, blinker } from '../components/CuteBird';
 import { ButterflyArt, ButterflyRig, TulipArt, TulipRig, TULIP_TOP, TULIP_HEAD } from '../components/Garden';
 import { AnimalArt, AnimalRig, ANIMAL_FEET } from '../components/Animals';
 import { Note, type NoteHandle } from '../components/Note';
+import { FairyArt, FairyRig, FAIRIES } from '../components/Fairy';
 import emptyUrl from '../assets/stop-empty.webp';
 import busUrl from '../assets/stop-bus.webp';
 import masksUrl from '../assets/stop-masks.png';
 import masks2Url from '../assets/stop-masks2.png';
 import filmUrl from '../assets/bus-arrives.mp4';
 import birdsongUrl from '../assets/birdsong.m4a';
+import lampUrl from '../assets/street-lamp.png';
+import moonUrl from '../assets/moon.png';
 import './busstop.css';
 
 const PIC_W = 1611, PIC_H = 906;
 const ASPECT_INV = PIC_H / PIC_W;
-// The part of the picture a narrow phone keeps in view: the shelter and the bus door.
-const FOCUS: Vec2 = [0.47, 0.5];
+// The part of the picture a narrow phone keeps in view: the shelter, the bus door, the lamp.
+const FOCUS: Vec2 = [0.525, 0.5];
 // The tulip grows in the grass in front; 420 drawing units tall.
-const TULIP_BASE: Vec2 = [0.415, 1.03];
+const TULIP_BASE: Vec2 = [0.455, 1.03];
 const TULIP_H = 0.34;
 // The butterfly's wingspan (176 drawing units), share of the picture height.
 const BF_SPAN = 0.1;
@@ -65,6 +70,40 @@ const STOP_FPS = 8;        // stop-motion frame rate
 const NIGHTS = [1, 2, 3, 3.65, 4];
 
 const CARDS = content.animals;
+const NAME = content.name.toUpperCase();
+const BUNTING = { wide: [content.banner.text.toUpperCase(), NAME], tall: [...content.banner.text.toUpperCase().split(' '), NAME] };
+const DISSOLVE = 4.2; // seconds for an animal to turn to dust
+const NOISE = dissolveNoise();
+// The dissolve mask covers the animal drawing's box (local units).
+const MASK_BOX = { x: -60, y: -60, w: 320, h: 270 };
+
+// How the characters are lit at each time of day (to sit in the painting):
+// a colour they're multiplied by, how saturated they stay, and their rim light.
+const LIGHTS = [
+  { tint: [1.0, 1.0, 0.97], sat: 0.96, rim: [255, 241, 201] },  // day
+  { tint: [1.08, 0.95, 0.78], sat: 0.98, rim: [255, 206, 140] }, // golden hour
+  { tint: [0.96, 0.74, 0.66], sat: 0.88, rim: [255, 170, 120] }, // sunset
+  { tint: [0.56, 0.6, 0.84], sat: 0.72, rim: [180, 196, 255] },  // blue hour
+  { tint: [0.5, 0.56, 0.8], sat: 0.6, rim: [205, 222, 255] },    // moonlit night
+];
+function sceneLight(night: number, rain: number) {
+  const i = Math.min(3, Math.floor(night)), f = Math.min(1, night - i);
+  const A = LIGHTS[i], B = LIGHTS[Math.min(4, i + 1)];
+  const lerp = (a: number, b: number) => a + (b - a) * f;
+  const dim = 1 - rain * 0.22;
+  const tint = A.tint.map((v, k) => lerp(v, B.tint[k]) * dim);
+  const sat = lerp(A.sat, B.sat) * (1 - rain * 0.4);
+  const rim = A.rim.map((v, k) => Math.round(lerp(v, B.rim[k])));
+  // saturation matrix, then each row tinted
+  const lr = 0.2126, lg = 0.7152, lb = 0.0722;
+  const m = [
+    [lr + (1 - lr) * sat, lg - lg * sat, lb - lb * sat],
+    [lr - lr * sat, lg + (1 - lg) * sat, lb - lb * sat],
+    [lr - lr * sat, lg - lg * sat, lb + (1 - lb) * sat],
+  ].map((row, r) => row.map((v) => v * tint[r]));
+  const values = `${m[0].join(' ')} 0 0 ${m[1].join(' ')} 0 0 ${m[2].join(' ')} 0 0 0 0 0 1 0`;
+  return { values, rim: `rgb(${rim.join(',')})`, shadow: 0.42 - Math.min(1, night / 4) * 0.2 };
+}
 const skip = new URLSearchParams(location.search).get('scene');
 
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -97,8 +136,7 @@ interface Actor {
   footL: number; footR: number;
   offer: number;
   clip: boolean;                       // only visible through the bus door
-  sweep: number;                       // golden-dust sweep, −1 off, 0 → 1
-  sweepFrom: number; sweepTo: number;
+  dust: number;                        // golden-dust threshold, −1 off, −0.15 → 1.05
 }
 
 interface Props {
@@ -117,8 +155,12 @@ export function BusStop({ flying, entered }: Props) {
   const bfG = useRef<SVGGElement>(null);
   const actorG = useRef<(SVGGElement | null)[]>([]);
   const actorRig = useRef<(SVGGElement | null)[]>([]);
-  const maskStops = useRef<(SVGStopElement | null)[][]>(CARDS.map(() => []));
-  const maskGrad = useRef<(SVGLinearGradientElement | null)[]>([]);
+  const dustFuncs = useRef<(SVGFEFuncRElement | null)[][]>(CARDS.map(() => []));
+  const shadows = useRef<(SVGEllipseElement | null)[]>([]);
+  const frontCanvas = useRef<HTMLCanvasElement>(null);
+  const buntingCanvas = useRef<HTMLCanvasElement>(null);
+  const fairyG = useRef<(SVGGElement | null)[]>([]);
+  const lightMatrix = useRef<SVGFEColorMatrixElement>(null);
   const doorClip = useRef<SVGRectElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const bubble = useRef<HTMLDivElement>(null);
@@ -129,14 +171,15 @@ export function BusStop({ flying, entered }: Props) {
   const lifeRef = useRef<Life | null>(null);
   const mapRef = useRef<{ map: (uv: Vec2) => Vec2; ppp: number; W: number; H: number }>({ map: (u) => u, ppp: 1, W: 1, H: 1 });
   const alive = useRef(true);
-  const waiters = useRef<{ pluck?: () => void; note?: () => void; answer?: (a: string) => void }>({});
+  const waiters = useRef<{ pluck?: () => void; note?: () => void; answer?: (a: string) => void; go?: () => void }>({});
+  const bannerRef = useRef<Banner | null>(null);
 
   const [arrived, setArrived] = useState(false);
   const [pictureReady, setPictureReady] = useState(false);
   const [noStage, setNoStage] = useState(false);
   const [noFog, setNoFog] = useState(false);
   const [noteIndex, setNoteIndex] = useState(0);
-  const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', bird: false });
+  const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', bird: false, moon: false, go: false });
 
   // GSAP animates these; the frame loop draws from them.
   const S = useRef({
@@ -146,10 +189,11 @@ export function BusStop({ flying, entered }: Props) {
     weights: [1, 0, 0] as [number, number, number],
     tulip: 0, bloom: 0, lift: { x: 0, y: 0, rot: 0, scale: 1 },        // tulip
     bf: { mode: 'off' as 'off' | 'in' | 'perch' | 'away', t: 0, from: [0, 0] as Vec2, to: [0, 0] as Vec2, x: 0, y: 0, tilt: 0 },
-    garden: 0, birds: 0, fireflies: 0,
+    garden: 0, fore: 0, birds: 0, fireflies: 0, lamp: 0,
+    banner: false, row0: 0, row1: 0, row2: 0, away: 0,                // the fairies' bunting
   }).current;
   const actors = useRef<Actor[]>(CARDS.map(() => ({
-    mode: 'off', x: 0, y: 0, size: 0, jx: 0, jy: 0, lean: 0, squash: 0, head: 0, footL: 0, footR: 0, offer: 0, clip: false, sweep: -1, sweepFrom: 0, sweepTo: 1,
+    mode: 'off', x: 0, y: 0, size: 0, jx: 0, jy: 0, lean: 0, squash: 0, head: 0, footL: 0, footR: 0, offer: 0, clip: false, dust: -1,
   }))).current;
   const sounds = useRef<{ rain?: LiveSound; wind?: LiveSound; crickets?: LiveSound; birdsong?: HTMLAudioElement }>({}).current;
 
@@ -161,7 +205,17 @@ export function BusStop({ flying, entered }: Props) {
     let stage: Stage | null = null;
     const fog = Fog.create(fogCanvas.current!);
     if (!fog) setNoFog(true);
-    const life = new Life(lifeCanvas.current!);
+    const life = new Life(lifeCanvas.current!, frontCanvas.current!);
+    let banner: Banner | null = null;
+    let bannerTop = 14;
+    void document.fonts.load('400 50px "Patrick Hand"').finally(() => {
+      if (cancelled) return;
+      const carriers: BannerBird[] = fairyG.current.map((g) => ({ g: g!, rig: new FairyRig(g!) }));
+      banner = new Banner(buntingCanvas.current!, carriers, BUNTING);
+      banner.resize(W, H, bannerTop);
+      bannerRef.current = banner;
+    });
+    let bannerHidden = false;
     lifeRef.current = life;
     if (skip) (window as unknown as { __life: Life }).__life = life; // for testing the shortcuts
     const rain = new Rain(rainCanvas.current!, undefined, prefersReducedMotion() ? 0.5 : 0.9);
@@ -181,6 +235,8 @@ export function BusStop({ flying, entered }: Props) {
       stage?.resize(W, H);
       fog?.resize();
       life.resize(W, H);
+      bannerTop = Math.max(14, H * 0.04);
+      banner?.resize(W, H, bannerTop);
       if (still.current) {
         const pos = (i: 0 | 1) => (base.span[i] >= 1 ? 50 : (base.offset[i] / (1 - base.span[i])) * 100);
         still.current.style.objectPosition = `${pos(0)}% ${pos(1)}%`;
@@ -189,7 +245,7 @@ export function BusStop({ flying, entered }: Props) {
     resize();
     window.addEventListener('resize', resize);
 
-    void Stage.create(stageCanvas.current!, { empty: emptyUrl, bus: busUrl, masks: masksUrl, masks2: masks2Url, width: PIC_W, height: PIC_H }, film.current!)
+    void Stage.create(stageCanvas.current!, { empty: emptyUrl, bus: busUrl, masks: masksUrl, masks2: masks2Url, lamp: lampUrl, moon: moonUrl, width: PIC_W, height: PIC_H }, film.current!)
       .then((s) => {
         if (cancelled) return s?.destroy();
         if (!s) setNoStage(true);
@@ -287,6 +343,13 @@ export function BusStop({ flying, entered }: Props) {
         doorClip.current.nextElementSibling?.setAttribute('y', (by * H).toFixed(1));
       }
 
+      // ── light the characters like the scene around them ──
+      const light = sceneLight(S.night, S.rain);
+      if (lightMatrix.current && lightMatrix.current.getAttribute('values') !== light.values) {
+        lightMatrix.current.setAttribute('values', light.values);
+        svg.current!.style.setProperty('--rim', light.rim);
+      }
+
       // ── the animals ──
       actors.forEach((a, i) => {
         const g = actorG.current[i]!;
@@ -294,22 +357,20 @@ export function BusStop({ flying, entered }: Props) {
         g.style.visibility = 'visible';
         const sc = a.size / 200;
         g.setAttribute('transform', `translate(${(a.x + a.jx - ANIMAL_FEET[0] * sc).toFixed(1)} ${(a.y + a.jy - ANIMAL_FEET[1] * sc).toFixed(1)}) scale(${sc.toFixed(4)})`);
-        const clipEl = g.firstElementChild as SVGGElement;
+        const clipEl = g.lastElementChild as SVGGElement; // (the first child is the shadow)
         const clipNow = a.clip ? 'url(#door-opening)' : '';
         if ((clipEl.getAttribute('clip-path') ?? '') !== clipNow) {
           if (clipNow) clipEl.setAttribute('clip-path', clipNow); else clipEl.removeAttribute('clip-path');
         }
-        const masked = a.sweep >= 0;
+        const masked = a.dust > -0.99;
         const maskEl = clipEl.firstElementChild as SVGGElement;
         if (masked) {
           maskEl.setAttribute('mask', `url(#dust-${i})`);
-          const grad = maskGrad.current[i]!;
-          grad.setAttribute('x1', a.sweepFrom.toFixed(1));
-          grad.setAttribute('x2', a.sweepTo.toFixed(1));
-          const [s0, s1] = maskStops.current[i];
-          s0!.setAttribute('offset', clamp(a.sweep).toFixed(3));
-          s1!.setAttribute('offset', clamp(a.sweep + 0.1).toFixed(3));
+          const k = 7, b = (-a.dust * k).toFixed(3);
+          for (const fn of dustFuncs.current[i]) fn?.setAttribute('intercept', b);
         } else if (maskEl.hasAttribute('mask')) maskEl.removeAttribute('mask');
+        const sh = shadows.current[i];
+        if (sh) sh.setAttribute('opacity', (light.shadow * (masked ? clamp(1 - (a.dust + 0.15) / 1.2) : 1) * (a.mode === 'door' && a.clip ? 0 : 1)).toFixed(3));
         const idle = a.mode === 'stand' || a.mode === 'row';
         const tw = idle ? 1 - twitch[i](time) : 0;
         rigs[i].pose({
@@ -332,7 +393,7 @@ export function BusStop({ flying, entered }: Props) {
       if (stage) {
         stage.render({
           time, layout, zoom: z, zoomCenter: center, blur: S.blur, focus,
-          weights: S.weights, rain: S.rain, night: S.night, door: S.door, wind: S.wind, cloud: S.cloud,
+          weights: S.weights, rain: S.rain, night: S.night, door: S.door, wind: S.wind, cloud: S.cloud, lamp: S.lamp,
         });
       } else if (still.current) {
         const s = still.current;
@@ -348,9 +409,14 @@ export function BusStop({ flying, entered }: Props) {
 
       // ── life, rain, fog ──
       life.amount.garden = S.garden;
+      life.amount.fore = S.fore;
       life.amount.birds = S.birds;
       life.amount.fireflies = S.fireflies;
       life.frame(time, dt, map, ppp);
+      if (banner && S.banner) {
+        if (S.away < 1) { banner.update(time, dt, [S.row0, S.row1, S.row2], S.away); bannerHidden = false; }
+        else if (!bannerHidden) { banner.hideAll(); bannerHidden = true; S.banner = false; }
+      }
       rain.update(dt, S.rainFall, false);
       rain.draw(0);
       sounds.rain?.setLevel(S.rainFall * 0.75);
@@ -366,11 +432,15 @@ export function BusStop({ flying, entered }: Props) {
 
     // tapping a bird (there is no hint that she can)
     const onSky = (e: PointerEvent) => {
-      if (S.birds < 0.2 || !life.hitBird(e.clientX, e.clientY)) return;
+      const { map, ppp, W: w, H: h } = mapRef.current;
+      const [mx, my] = map(MOON);
+      const onMoon = S.night > 3.2 && Math.hypot(mx * w - e.clientX, my * h - e.clientY) < Math.max(34, MOON_R * ppp * 1.3);
+      const onBird = S.birds > 0.2 && life.hitBird(e.clientX, e.clientY);
+      if (!onMoon && !onBird) return;
       e.stopPropagation();
       e.preventDefault();
       buzz(10);
-      setUi((u) => ({ ...u, bird: true }));
+      setUi((u) => ({ ...u, bird: onBird && !onMoon, moon: onMoon }));
     };
     window.addEventListener('pointerdown', onSky, true);
 
@@ -403,12 +473,13 @@ export function BusStop({ flying, entered }: Props) {
       const id = window.setTimeout(() => setPictureReady(true), 3000);
       return () => clearTimeout(id);
     }
-    // the flight through the fog: about 7 seconds
+    // the flight through the fog: about 7 seconds (4.5 on a phone)
+    const k = window.innerWidth / window.innerHeight < 1 ? 0.64 : 1;
     const tl = gsap.timeline({ onComplete: () => { sounds.wind?.stop(1.2); sounds.wind = undefined; setArrived(true); } });
-    tl.to(S, { light: 1, duration: 3, ease: ease.scenery, overwrite: 'auto' }, 0)
-      .to(S, { travel: 8.2, duration: 6.8, ease: 'sine.inOut' }, 0)
-      .to(S, { haze: 0, duration: 4, ease: ease.scenery }, 2.6)
-      .set(S, { fogGone: true }, 7);
+    tl.to(S, { light: 1, duration: 3 * k, ease: ease.scenery, overwrite: 'auto' }, 0)
+      .to(S, { travel: 8.2, duration: 6.8 * k, ease: 'sine.inOut' }, 0)
+      .to(S, { haze: 0, duration: 4 * k, ease: ease.scenery }, 2.6 * k)
+      .set(S, { fogGone: true }, 7 * k);
     const windLoop = () => sounds.wind?.setLevel(0.18 * S.haze + 0.5 * clamp(1 - Math.abs(S.travel - 4) / 4));
     gsap.ticker.add(windLoop);
     if (prefersReducedMotion()) tl.timeScale(2);
@@ -437,7 +508,7 @@ export function BusStop({ flying, entered }: Props) {
     if (skip === 'pluck' || skip === 'bus' || skip === 'animals' || skip === 'question') {
       Object.assign(S, { haze: 0, travel: 8.2, light: 1, fogGone: true, rain: 0, rainFall: 0, wind: 0.35, cloud: 1, tulip: 1, bloom: 1 });
     }
-    if (skip === 'bus' || skip === 'animals' || skip === 'question') Object.assign(S, { tulip: 0, garden: 1, birds: 1 });
+    if (skip === 'bus' || skip === 'animals' || skip === 'question') Object.assign(S, { tulip: 0, garden: 1, fore: 1, birds: 1 });
     if (skip === 'animals' || skip === 'question') { S.weights = [0, 0, 1]; S.door = 1; }
 
     if (!skip || skip === 'stop' || skip === 'pluck') {
@@ -465,9 +536,10 @@ export function BusStop({ flying, entered }: Props) {
       showBubble();
       await tapPluck();
       await pluck();
-      // ── the garden ──
-      gsap.to(S, { garden: 1, birds: 1, duration: 2, ease: ease.enter });
-      await wait(4);
+      // ── the garden, and the fairies with the bunting ──
+      gsap.to(S, { garden: 1, fore: 1, birds: 1, duration: 2, ease: ease.enter });
+      await wait(1.2);
+      await bunting();
     }
 
     if (skip !== 'animals' && skip !== 'question') {
@@ -483,7 +555,7 @@ export function BusStop({ flying, entered }: Props) {
       gsap.to(S, { fireflies: 1, duration: 3.5, ease: 'sine.inOut' });
       await wait(2.5);
     } else {
-      Object.assign(S, { night: 4, garden: 0, birds: 0, fireflies: 1 });
+      Object.assign(S, { night: 4, garden: 0, fore: 0, birds: 0, fireflies: 1, lamp: 1 });
       sounds.crickets ??= createCrickets();
       sounds.crickets.setLevel(1);
     }
@@ -563,7 +635,7 @@ export function BusStop({ flying, entered }: Props) {
     // the stem snaps and the flower comes up out of the grass
     playSnap();
     const base = mapRef.current.map(TULIP_BASE);
-    lifeRef.current!.petalBurst(base[0] * W, Math.min(H - 10, base[1] * H), 8, ['#4f8a32', '#6aa83e', '#3f7a2c']);
+    lifeRef.current!.leafBits(base[0] * W, Math.min(H - 10, base[1] * H));
     await play(gsap.to(S.lift, { y: -60, rot: -6, duration: 0.4, ease: 'back.out(2)' }));
     // …and flies at the screen
     const sc = (TULIP_H / 420) * ppp;
@@ -574,10 +646,28 @@ export function BusStop({ flying, entered }: Props) {
     await play(gsap.to(S.lift, { x: dx, y: dy - 60, rot: 14, scale: cover, duration: 1.15, ease: 'power2.in' }));
     // a burst of petals, and the garden comes back
     gsap.timeline().to(flash.current, { autoAlpha: 0.85, duration: 0.12, ease: 'power1.out' }).to(flash.current, { autoAlpha: 0, duration: 0.9, ease: 'sine.out' });
-    lifeRef.current!.petalBurst(W / 2, H / 2, 90, ['#ff5f86', '#ffc2d0', '#c81e48', '#ff8fab', '#ffe1e8']);
+    lifeRef.current!.petalBurst(W / 2, H / 2, 70);
     playPop(0.7);
     S.tulip = 0;
     await closeUp(false);
+  }
+
+  async function bunting() {
+    // wait for the flags to be painted (fonts)
+    for (let k = 0; k < 40 && !bannerRef.current; k++) await wait(0.1);
+    if (!bannerRef.current) return;
+    Object.assign(S, { banner: true, away: 0, row0: 0, row1: 0, row2: 0 });
+    gsap.to(S, { row0: 1, duration: 2.6, ease: 'power3.out' });
+    gsap.to(S, { row1: 1, duration: 2.6, ease: 'power3.out', delay: 0.55 });
+    gsap.to(S, { row2: 1, duration: 2.6, ease: 'power3.out', delay: 1.1 });
+    gsap.delayedCall(1.6, () => playShimmer(1.4));
+    await wait(5.4);
+    setUi((u) => ({ ...u, go: true }));
+    await new Promise<void>((r) => { waiters.current.go = r; }).then(live);
+    setUi((u) => ({ ...u, go: false }));
+    buzz(12);
+    gsap.to(S, { away: 1, duration: 2.6, ease: 'power1.in' });
+    await wait(1.6);
   }
 
   async function busArrives() {
@@ -618,7 +708,7 @@ export function BusStop({ flying, entered }: Props) {
       a.size = EXIT_SIZE * ppp * scale;
     };
     const jitter = (k = 1) => { a.jx = rand(-1, 1) * k; a.jy = rand(-1, 1) * k; a.lean = rand(-1.5, 1.5) * k; };
-    Object.assign(a, { mode: 'door', offer: 0, squash: 0, head: 0, footL: 0, footR: 0, clip: true, sweep: -1 });
+    Object.assign(a, { mode: 'door', offer: 0, squash: 0, head: 0, footL: 0, footR: 0, clip: true, dust: -1 });
     setNoteIndex(i);
     rig().querySelector<SVGGElement>('[data-part="scroll"]')!.style.visibility = 'visible';
 
@@ -671,10 +761,17 @@ export function BusStop({ flying, entered }: Props) {
 
     // …and dissolves into golden dust; the day moves on
     gsap.to(S, { night: NIGHTS[i], duration: 5, ease: 'sine.inOut' });
-    if (i === 1) gsap.to(S, { birds: 0.5, duration: 4 });
+    if (i === 1) {
+      gsap.to(S, { birds: 0.5, duration: 4 });
+      // the street lamp flickers on as the sun goes down
+      gsap.timeline({ delay: 3.6 })
+        .to(S, { lamp: 0.6, duration: 0.08 }).to(S, { lamp: 0.1, duration: 0.1 })
+        .to(S, { lamp: 0.8, duration: 0.08 }).to(S, { lamp: 0.3, duration: 0.12 })
+        .to(S, { lamp: 1, duration: 0.6, ease: 'sine.out' });
+    }
     if (i === 2) { gsap.to(S, { garden: 0, duration: 4 }); fadeBirdsong(); }
     if (i === 3) {
-      gsap.to(S, { birds: 0, duration: 4 });
+      gsap.to(S, { birds: 0, fore: 0, duration: 4 });
       const c = (sounds.crickets ??= createCrickets());
       const lvl = { v: 0 };
       gsap.to(lvl, { v: 1, duration: 5, onUpdate: () => c.setLevel(lvl.v) });
@@ -693,22 +790,21 @@ export function BusStop({ flying, entered }: Props) {
     const a = actors[i];
     const g = actorG.current[i]!;
     const r = g.getBoundingClientRect();
-    const sweep = 2.3;
-    const pts = await sampleActor(i, r, sweep).catch(() => []);
+    const pts = await sampleActor(i, r).catch(() => []);
     live(0);
-    a.sweepFrom = r.left - 4;
-    a.sweepTo = r.right + 4;
-    a.sweep = 0;
+    a.dust = -0.15;
     lifeRef.current!.dust(pts);
-    playShimmer(sweep + 0.3);
-    await play(gsap.to(a, { sweep: 1.05, duration: sweep, ease: 'none' }));
+    playShimmer(DISSOLVE);
+    // the threshold rises at a steady pace: the same amount of it vanishes every moment
+    await play(gsap.to(a, { dust: 1.05, duration: DISSOLVE, ease: 'none' }));
     a.mode = 'off';
-    a.sweep = -1;
+    a.dust = -1;
   }
 
-  /** where the animal's pixels are, and their colours (for the golden dust) */
-  async function sampleActor(i: number, r: DOMRect, sweep: number) {
+  /** where the animal's pixels are and their colours, and when each one turns to dust */
+  async function sampleActor(i: number, r: DOMRect) {
     const { W, H } = mapRef.current;
+    const a = actors[i];
     const clone = svg.current!.cloneNode(true) as SVGSVGElement;
     clone.querySelectorAll('[data-actor]').forEach((el) => { if (el.getAttribute('data-actor') !== String(i)) el.remove(); });
     clone.querySelectorAll('[mask],[clip-path]').forEach((el) => { el.removeAttribute('mask'); el.removeAttribute('clip-path'); });
@@ -726,13 +822,18 @@ export function BusStop({ flying, entered }: Props) {
     const g = cv.getContext('2d', { willReadFrequently: true })!;
     g.drawImage(img, -r.left, -r.top);
     const data = g.getImageData(0, 0, w, h).data;
-    const step = Math.max(2, Math.round(Math.sqrt((w * h) / 2600)));
+    const step = Math.max(2, Math.round(Math.sqrt((w * h) / 3200)));
+    const sc = a.size / 200;
+    const tx = a.x + a.jx - ANIMAL_FEET[0] * sc, ty = a.y + a.jy - ANIMAL_FEET[1] * sc;
     const pts: { x: number; y: number; r: number; g: number; b: number; delay: number }[] = [];
     for (let y = 0; y < h; y += step) {
       for (let x = 0; x < w; x += step) {
         const o = (y * w + x) * 4;
         if (data[o + 3] < 140) continue;
-        pts.push({ x: r.left + x, y: r.top + y, r: data[o], g: data[o + 1], b: data[o + 2], delay: (x / w) * sweep + rand(-0.05, 0.12) });
+        // the noise value under this pixel decides when it goes
+        const lx = (r.left + x - tx) / sc, ly = (r.top + y - ty) / sc;
+        const v = NOISE.sample((lx - MASK_BOX.x) / MASK_BOX.w, (ly - MASK_BOX.y) / MASK_BOX.h);
+        pts.push({ x: r.left + x, y: r.top + y, r: data[o], g: data[o + 1], b: data[o + 2], delay: ((v + 0.08) / 1.2) * DISSOLVE });
       }
     }
     return pts;
@@ -748,7 +849,7 @@ export function BusStop({ flying, entered }: Props) {
     for (let i = 0; i < n; i++) {
       const a = actors[i];
       const x = W / 2 - spread / 2 + (spread / n) * (i + 0.5);
-      Object.assign(a, { mode: 'row', x, y: H * 0.95, size: 0, offer: 0, clip: false, sweep: -1, squash: 0, lean: 0, head: 0, jx: 0, jy: 0 });
+      Object.assign(a, { mode: 'row', x, y: H * 0.95, size: 0, offer: 0, clip: false, dust: -1, squash: 0, lean: 0, head: 0, jx: 0, jy: 0 });
       actorRig.current[i]!.querySelector<SVGGElement>('[data-part="scroll"]')!.style.visibility = 'hidden';
       gsap.to(a, { size, duration: 0.55, ease: 'back.out(2)', delay: i * 0.18 });
       gsap.delayedCall(i * 0.18, () => {
@@ -788,44 +889,65 @@ export function BusStop({ flying, entered }: Props) {
         <img ref={still} className="layer stop__still" src={emptyUrl} alt="" />
         <canvas ref={stageCanvas} className="layer" hidden={noStage} />
         <canvas ref={lifeCanvas} className="layer" />
+        <canvas ref={buntingCanvas} className="layer" />
       </div>
 
       <svg ref={svg} className="layer stop__cast" aria-hidden="true">
         <defs>
           <GrainPattern id="grain-stop" />
+          {/* the scene's light on the characters */}
+          <filter id="scene-light" colorInterpolationFilters="sRGB">
+            <feColorMatrix ref={lightMatrix} type="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0" />
+          </filter>
+          <radialGradient id="contact-shadow">
+            <stop offset="0" stopColor="#0d0a06" stopOpacity="0.9" />
+            <stop offset="1" stopColor="#0d0a06" stopOpacity="0" />
+          </radialGradient>
           <clipPath id="door-opening" clipPathUnits="userSpaceOnUse">
             <rect ref={doorClip} x="0" y="0" width="0" height="0" />
             <rect x="-5000" y="0" width="20000" height="20000" />
           </clipPath>
           {CARDS.map((_, i) => (
-            <mask key={i} id={`dust-${i}`} maskUnits="userSpaceOnUse" x="-5000" y="-5000" width="20000" height="20000">
-              <linearGradient ref={(el) => { maskGrad.current[i] = el; }} id={`dust-grad-${i}`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="0">
-                <stop ref={(el) => { maskStops.current[i][0] = el; }} offset="0" stopColor="#000" />
-                <stop ref={(el) => { maskStops.current[i][1] = el; }} offset="0.1" stopColor="#fff" />
-              </linearGradient>
-              <rect x="-5000" y="-5000" width="20000" height="20000" fill={`url(#dust-grad-${i})`} />
-            </mask>
+            <g key={i}>
+              <filter id={`dust-edge-${i}`} x="0" y="0" width="1" height="1" colorInterpolationFilters="sRGB">
+                <feComponentTransfer>
+                  <feFuncR ref={(el) => { dustFuncs.current[i][0] = el; }} type="linear" slope="7" intercept="1" />
+                  <feFuncG ref={(el) => { dustFuncs.current[i][1] = el as unknown as SVGFEFuncRElement; }} type="linear" slope="7" intercept="1" />
+                  <feFuncB ref={(el) => { dustFuncs.current[i][2] = el as unknown as SVGFEFuncRElement; }} type="linear" slope="7" intercept="1" />
+                </feComponentTransfer>
+              </filter>
+              <mask id={`dust-${i}`} maskUnits="userSpaceOnUse" x="-200" y="-200" width="600" height="600">
+                <image href={NOISE.url} x={MASK_BOX.x} y={MASK_BOX.y} width={MASK_BOX.w} height={MASK_BOX.h} preserveAspectRatio="none" filter={`url(#dust-edge-${i})`} />
+              </mask>
+            </g>
           ))}
         </defs>
-        <g ref={tulipG} data-actor="tulip" style={{ visibility: 'hidden' }}>
+        <g ref={tulipG} data-actor="tulip" style={{ visibility: 'hidden' }} filter="url(#scene-light)">
           <TulipArt grain="grain-stop" />
         </g>
         {CARDS.map((c, i) => (
           <g key={i} ref={(el) => { actorG.current[i] = el; }} data-actor={String(i)} style={{ visibility: 'hidden' }}>
+            <ellipse ref={(el) => { shadows.current[i] = el; }} cx="100" cy="193" rx="66" ry="11" fill="url(#contact-shadow)" opacity="0.4" />
             <g>
               <g>
-                <g ref={(el) => { actorRig.current[i] = el; }}>
+                <g ref={(el) => { actorRig.current[i] = el; }} filter="url(#scene-light)">
                   <AnimalArt kind={c.animal} grain="grain-stop" />
                 </g>
               </g>
             </g>
           </g>
         ))}
-        <g ref={bfG} data-actor="butterfly" style={{ visibility: 'hidden' }}>
+        {FAIRIES.map((look, i) => (
+          <g key={`f${i}`} ref={(el) => { fairyG.current[i] = el; }} data-actor={`fairy${i}`} style={{ visibility: 'hidden' }} filter="url(#scene-light)">
+            <FairyArt look={look} grain="grain-stop" />
+          </g>
+        ))}
+        <g ref={bfG} data-actor="butterfly" style={{ visibility: 'hidden' }} filter="url(#scene-light)">
           <ButterflyArt grain="grain-stop" />
         </g>
       </svg>
 
+      <canvas ref={frontCanvas} className="layer stop__front" aria-hidden="true" />
       <canvas ref={rainCanvas} className="layer stop__rain" aria-hidden="true" />
       <canvas ref={fogCanvas} className="layer" hidden={noFog} aria-hidden="true" />
       <div ref={vignette} className="layer stop__vignette" />
@@ -847,13 +969,21 @@ export function BusStop({ flying, entered }: Props) {
 
       <Note ref={note} message={CARDS[noteIndex].message} hint={content.noteHint} onTap={() => waiters.current.note?.()} />
 
-      {/* tapping a bird */}
-      {ui.bird && (
-        <button type="button" className="layer stop__veil" onPointerDown={() => setUi((u) => ({ ...u, bird: false }))}>
-          <span className="stop__birdcard" role="note">
-            <strong>{content.birds.title}</strong>
-            <span>{content.birds.meaning}</span>
-            <em>{content.birds.close}</em>
+      {/* under the bunting: tap anywhere to go on */}
+      {ui.go && (
+        <button type="button" className="layer stop__go" autoFocus onPointerDown={() => waiters.current.go?.()}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') waiters.current.go?.(); }}>
+          <span className="stop__gohint">{content.banner.continueHint}</span>
+        </button>
+      )}
+
+      {/* tapping a bird, or the moon */}
+      {(ui.bird || ui.moon) && (
+        <button type="button" className="layer stop__veil" onPointerDown={() => setUi((u) => ({ ...u, bird: false, moon: false }))}>
+          <span className={`stop__birdcard${ui.moon ? ' stop__birdcard--moon' : ''}`} role="note">
+            <strong>{ui.moon ? content.moon.title : content.birds.title}</strong>
+            <span>{ui.moon ? content.moon.meaning : content.birds.meaning}</span>
+            <em>{ui.moon ? content.moon.close : content.birds.close}</em>
           </span>
         </button>
       )}

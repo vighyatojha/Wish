@@ -137,7 +137,7 @@ export function AnimalArt({ kind, grain }: { kind: AnimalKind; grain: string }) 
       </radialGradient>
       <linearGradient id={id('rim')} x1="0.45" y1="0.6" x2="1" y2="0.15">
         <stop offset="0" stopColor="#fff1c9" stopOpacity="0" />
-        <stop offset="1" stopColor="#fff1c9" stopOpacity="0.5" />
+        <stop offset="1" style={{ stopColor: 'var(--rim, #fff1c9)' }} stopOpacity="0.55" />
       </linearGradient>
       <radialGradient id={id('cream')} cx="0.5" cy="0.35" r="0.75">
         <stop offset="0" stopColor="#ffffff" />

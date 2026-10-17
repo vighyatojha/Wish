@@ -40,6 +40,22 @@ export const content = {
     tapLabel: 'Pluck the flower',
   },
 
+  // After the tulip: fairies fly in carrying birthday bunting, with her
+  // name (above) underneath.
+  banner: {
+    text: 'Happy Birthday',
+    continueHint: 'Tap anywhere to continue',
+  },
+
+  // Tapping the moon at night (no hint here either) shows this.
+  // A placeholder: replace it with your own reason.
+  moon: {
+    title: 'Why is the moon here?',
+    meaning:
+      'Because tonight it is full, just like this day. However dark it gets, something keeps shining for you, and it always comes back, night after night.',
+    close: 'tap anywhere to close',
+  },
+
   // Tapping a bird in the sky (there is no hint that she can) shows this.
   birds: {
     title: 'Why white birds and black birds?',

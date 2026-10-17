@@ -21,14 +21,19 @@ import type { CoverLayout, Vec2 } from './camera';
 
 // The bus door in the picture (0–1): its two folding leaves meet at DOOR.mid.
 export const DOOR = { x0: 0.4985, mid: 0.5202, x1: 0.5419, y0: 0.4735, y1: 0.6932 };
-export const MOON: Vec2 = [0.47, 0.11];
+export const MOON: Vec2 = [0.5, 0.12];
+export const MOON_R = 0.052; // radius, share of the picture height
+// The street lamp just past the shelter: its sprite's place in the picture.
+const LAMP_H = 0.375, LAMP_X = 0.6425, LAMP_BASE = 0.705;
+const LAMP_W = (LAMP_H * (80 / 680)) * (906 / 1611);
+export const LAMP = { x0: LAMP_X - LAMP_W / 2, x1: LAMP_X + LAMP_W / 2, y0: LAMP_BASE - LAMP_H, y1: LAMP_BASE };
 
 const FRAG = `#version 300 es
 precision highp float;
 in vec2 vUv;
 out vec4 outColor;
 
-uniform sampler2D uEmpty, uBus, uVideo, uMask, uMask2, uNoise;
+uniform sampler2D uEmpty, uBus, uVideo, uMask, uMask2, uNoise, uLamp, uMoonTex;
 uniform vec3  uW;               // weights: empty stop · video · parked bus
 uniform vec2  uOffset, uSpan, uZoomC;
 uniform float uZoom, uTime, uAspect, uScreenAspect;
@@ -42,6 +47,9 @@ uniform float uCloud;           // cloud drift
 uniform vec2  uMoon;
 uniform vec4  uDoorRect;        // x0, x1, y0, y1
 uniform float uDoorMid;
+uniform vec4  uLampRect;        // x0, y0, x1, y1 in the picture
+uniform float uLampOn;          // 0 off → 1 lit
+uniform float uMoonR;
 
 float gLod;
 float noise(vec2 p) { return texture(uNoise, p).r; }
@@ -165,6 +173,14 @@ void main() {
     vec2 flow = vec2(0.014, 0.001) * (0.55 + 0.9 * v) * (1.25 - uv.y * 1.5) * uCloud;
     col = mix(col, flowed(uv, flow, 10.0, noise(uv * 3.1) * 0.6), sky);
   }
+  // the street lamp, standing in the scene (graded with it below)
+  vec2 luv = (uv - uLampRect.xy) / (uLampRect.zw - uLampRect.xy);
+  float lampA = 0.0;
+  if (luv.x > 0.0 && luv.x < 1.0 && luv.y > 0.0 && luv.y < 1.0) {
+    vec4 L = texture(uLamp, luv);
+    lampA = L.a;
+    col = mix(col, L.rgb, L.a);
+  }
   vec3 orig = col;
 
   // ── rain: overcast, wet, hazy ──
@@ -209,16 +225,48 @@ void main() {
     }
   }
 
-  // ── the moon ──
+  // ── the moon: a textured full moon, its glow, and moonlight on clouds and hills ──
   float moon = smoothstep(3.0, 4.0, uNight);
   if (moon > 0.001) {
     vec2 d = (uv - uMoon) * vec2(uAspect, 1.0);
     float r = length(d);
-    float clear = 1.0 - smoothstep(0.55, 0.85, luma(orig)) * 0.8;
-    float disk = 1.0 - smoothstep(0.024, 0.027, r);
-    float crater = noise(d * 9.0 + 0.3) * 0.12;
-    col = mix(col, vec3(0.96, 0.95, 0.88) - crater, disk * moon * clear * sky);
-    col += vec3(0.6, 0.65, 0.8) * (exp(-r * 22.0) * 0.35 + exp(-r * 6.0) * 0.08) * moon * sky;
+    float R = uMoonR;
+    float clear = 1.0 - smoothstep(0.55, 0.85, luma(orig)) * 0.75;
+    if (r < R * 1.05) {
+      vec2 q = d / R;                                  // −1 … 1 across the disk
+      float z = sqrt(max(0.0, 1.0 - dot(q, q)));
+      vec2 sph = q * (0.82 + 0.18 * z);                // wrap the surface round the ball
+      float alb = texture(uMoonTex, sph * 0.5 + 0.5).r;
+      vec3 surf = vec3(alb) * vec3(1.0, 0.985, 0.94) * 0.94;
+      surf *= 0.72 + 0.28 * z;                          // darker towards the edge (limb)
+      float disk = 1.0 - smoothstep(R * 0.985, R * 1.02, r);
+      col = mix(col, surf, disk * moon * mix(1.0, clear, 0.7) * sky);
+    }
+    float halo = exp(-max(0.0, r - R) * 16.0) * 0.32 + exp(-r * 4.5) * 0.1;
+    col += vec3(0.62, 0.68, 0.85) * halo * moon * sky;
+    // the edges of nearby clouds catch the moonlight
+    float cl = smoothstep(0.45, 0.8, luma(orig)) * sky;
+    col += vec3(0.22, 0.25, 0.36) * cl * exp(-r * 3.2) * moon;
+    // the hills shine softly under the full moon
+    float hills = smoothstep(0.42, 0.47, uv.y) * smoothstep(0.62, 0.54, uv.y) * (1.0 - sky) * (1.0 - m2.r * uW.z)
+                * clamp((orig.b - orig.r) * 3.5, 0.0, 1.0);
+    col += vec3(0.16, 0.2, 0.32) * hills * (0.4 + luma(orig)) * moon;
+  }
+
+  // ── the street lamp coming on ──
+  if (uLampOn > 0.001) {
+    vec2 head = vec2((uLampRect.x + uLampRect.z) * 0.5, uLampRect.y + (uLampRect.w - uLampRect.y) * 0.11);
+    float glass = 0.0;
+    if (luv.x > 0.27 && luv.x < 0.73 && luv.y > 0.07 && luv.y < 0.15) glass = lampA;
+    col = mix(col, vec3(1.0, 0.86, 0.58) * 1.25, glass * uLampOn);
+    vec2 dh = (uv - head) * vec2(uAspect, 1.0);
+    col += vec3(1.0, 0.78, 0.45) * (exp(-length(dh) * 55.0) * 0.55 + exp(-length(dh) * 14.0) * 0.12) * uLampOn;
+    // a soft cone of light and a warm pool on the ground beneath it
+    float below = uv.y - head.y;
+    float cone = below > 0.0 ? exp(-pow(abs(uv.x - head.x) * uAspect / (0.02 + below * 0.32), 2.0)) * exp(-below * 4.5) : 0.0;
+    col += vec3(1.0, 0.8, 0.5) * cone * 0.07 * uLampOn * (1.0 - lampA);
+    vec2 dp = (uv - vec2(head.x, uLampRect.w + 0.02)) * vec2(uAspect * 1.1, 3.6);
+    col += vec3(1.0, 0.76, 0.46) * exp(-dot(dp, dp) * 30.0) * 0.28 * uLampOn * (1.0 - sky);
   }
 
   outColor = vec4(col, 1.0);
@@ -237,6 +285,7 @@ export interface StageFrame {
   door: number;
   wind: number;
   cloud: number;
+  lamp: number;       // 0 off → 1 lit
 }
 
 export interface StagePictures {
@@ -244,6 +293,8 @@ export interface StagePictures {
   bus: string;
   masks: string;
   masks2: string;
+  lamp: string;
+  moon: string;
   width: number;
   height: number;
 }
@@ -270,7 +321,7 @@ export class Stage {
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false });
     if (!gl) return null;
     try {
-      const imgs = await Promise.all([pics.empty, pics.bus, pics.masks, pics.masks2].map(loadImage));
+      const imgs = await Promise.all([pics.empty, pics.bus, pics.masks, pics.masks2, pics.lamp, pics.moon].map(loadImage));
       return new Stage(canvas, gl, pics, imgs, video, maxDpr);
     } catch (err) {
       console.warn('Animated background unavailable, showing the still picture:', err);
@@ -282,7 +333,7 @@ export class Stage {
     private canvas: HTMLCanvasElement,
     private gl: WebGL2RenderingContext,
     pics: StagePictures,
-    [empty, bus, masks, masks2]: HTMLImageElement[],
+    [empty, bus, masks, masks2, lamp, moonTex]: HTMLImageElement[],
     private video: HTMLVideoElement,
     private maxDpr: number,
   ) {
@@ -291,6 +342,7 @@ export class Stage {
     this.u = uniforms(gl, this.program, [
       'uEmpty', 'uBus', 'uVideo', 'uMask', 'uMask2', 'uNoise', 'uW', 'uOffset', 'uSpan', 'uZoomC', 'uZoom', 'uTime',
       'uAspect', 'uScreenAspect', 'uLod', 'uFocus', 'uRain', 'uNight', 'uDoor', 'uWind', 'uCloud', 'uMoon', 'uDoorRect', 'uDoorMid',
+      'uLamp', 'uLampRect', 'uLampOn', 'uMoonR', 'uMoonTex',
     ] as const);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     this.textures = [
@@ -299,6 +351,8 @@ export class Stage {
       createTexture(gl, 3, masks, { mipmaps: true }),
       createTexture(gl, 4, masks2),
       createTexture(gl, 5, makeFogNoise(256), { repeat: true }),
+      createTexture(gl, 6, lamp),
+      createTexture(gl, 7, moonTex, { mipmaps: true }),
     ];
     this.videoTex = createTexture(gl, 2, null);
     const u = this.u;
@@ -308,6 +362,10 @@ export class Stage {
     gl.uniform1i(u.uMask, 3);
     gl.uniform1i(u.uMask2, 4);
     gl.uniform1i(u.uNoise, 5);
+    gl.uniform1i(u.uLamp, 6);
+    gl.uniform1i(u.uMoonTex, 7);
+    gl.uniform4f(u.uLampRect, LAMP.x0, LAMP.y0, LAMP.x1, LAMP.y1);
+    gl.uniform1f(u.uMoonR, MOON_R);
     gl.uniform1f(u.uAspect, pics.width / pics.height);
     gl.uniform2f(u.uMoon, MOON[0], MOON[1]);
     gl.uniform4f(u.uDoorRect, DOOR.x0, DOOR.x1, DOOR.y0, DOOR.y1);
@@ -357,6 +415,7 @@ export class Stage {
     gl.uniform1f(u.uDoor, f.door);
     gl.uniform1f(u.uWind, f.wind);
     gl.uniform1f(u.uCloud, f.cloud);
+    gl.uniform1f(u.uLampOn, f.lamp);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 

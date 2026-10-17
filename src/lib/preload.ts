@@ -10,13 +10,15 @@ import masksUrl from '../assets/stop-masks.png';
 import masks2Url from '../assets/stop-masks2.png';
 import filmUrl from '../assets/bus-arrives.mp4';
 import birdsongUrl from '../assets/birdsong.m4a';
+import lampUrl from '../assets/street-lamp.png';
+import moonUrl from '../assets/moon.png';
 
 let started = false;
 
 export function preloadStory(): void {
   if (started) return;
   started = true;
-  for (const url of [emptyUrl, busUrl, masksUrl, masks2Url]) {
+  for (const url of [emptyUrl, busUrl, masksUrl, masks2Url, lampUrl, moonUrl]) {
     const img = new Image();
     img.decoding = 'async';
     img.src = url;

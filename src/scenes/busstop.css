@@ -121,10 +121,11 @@
 /* the question */
 .stop__question {
   position: absolute;
-  left: 50%;
-  top: 9svh;
-  width: min(90vw, 26rem);
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  top: 39svh;   /* below the moon and the lamp, above the animals */
+  width: min(88vw, 26rem);
   padding: 1.2rem 1.2rem 1.1rem;
   text-align: center;
   color: #f6eedd;
@@ -162,4 +163,41 @@
 
 @media (prefers-reduced-motion: reduce) {
   .stop__ring, .stop__hand { animation: none; }
+}
+
+.stop__front { pointer-events: none; }
+/* soften the characters' ink lines so they sit in the painting */
+.stop__cast [data-actor] path[stroke], .stop__cast [data-actor] ellipse[stroke], .stop__cast [data-actor] circle[stroke] { stroke-opacity: 0.78; }
+
+/* under the bunting: tap anywhere to go on */
+.stop__go {
+  all: unset;
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  padding-bottom: calc(9% + env(safe-area-inset-bottom));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.stop__gohint {
+  padding: 0.55rem 1.1rem 0.6rem;
+  font: 400 clamp(1.15rem, 1rem + 0.6vw, 1.35rem) / 1.2 'Patrick Hand', 'Comic Sans MS', cursive;
+  color: #3a2a1e;
+  background: rgba(251, 243, 225, 0.92);
+  border: 1.5px solid rgba(91, 59, 41, 0.6);
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(18, 12, 4, 0.25);
+  animation: stop-card 0.4s cubic-bezier(0.22, 1, 0.36, 1) both, go-breathe 2.4s ease-in-out 0.4s infinite;
+}
+@keyframes go-breathe { 50% { opacity: 0.7; } }
+
+/* the moon's note: night colours */
+.stop__birdcard--moon { color: #eef0ff; background: rgba(22, 28, 58, 0.9); box-shadow: 0 0 0 1px rgba(200, 210, 255, 0.35), 0 0 40px rgba(170, 190, 255, 0.25), 0 14px 32px rgba(0, 0, 0, 0.45); }
+.stop__birdcard--moon em { color: #aab2d8; }
+
+/* wide screens: the question sits to the left, clear of the moon, the lamp and the animals */
+@media (min-aspect-ratio: 21/20) {
+  .stop__question { right: auto; left: 4vw; margin: 0; top: 20svh; width: min(40vw, 25rem); }
 }
