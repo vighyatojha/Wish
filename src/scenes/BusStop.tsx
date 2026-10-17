@@ -197,11 +197,28 @@ export function BusStop({ flying, entered }: Props) {
         setPictureReady(true);
       });
 
+    // if the device is struggling, draw at a lower resolution until it keeps up
+    const QUALITY = [1.5, 1.1, 0.8, 0.6];
+    let quality = 0, slowFrames = 0, slowTime = 0;
+    const adapt = (rawDt: number) => {
+      if (rawDt > 1 / 24) { slowFrames++; slowTime += rawDt; } else slowFrames = Math.max(0, slowFrames - 1);
+      if (slowFrames > 30 && slowTime > 1.5 && quality < QUALITY.length - 1) {
+        quality++;
+        slowFrames = 0;
+        slowTime = 0;
+        stage?.setMaxDpr(QUALITY[quality]);
+        life.maxDpr = Math.min(1.75, QUALITY[quality]);
+        life.resize(W, H);
+      }
+    };
+
     let last = 0;
     const frame = (now: number) => {
-      const dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
+      const rawDt = last ? (now - last) / 1000 : 0.016;
+      const dt = Math.min(0.05, rawDt);
       last = now;
       const time = now / 1000;
+      if (rawDt < 1) adapt(rawDt);
 
       // ── camera ──
       const z = S.z;
@@ -319,6 +336,7 @@ export function BusStop({ flying, entered }: Props) {
         });
       } else if (still.current) {
         const s = still.current;
+        s.style.visibility = 'visible';
         const src = S.weights[2] > 0.5 ? busUrl : emptyUrl;
         if (!s.src.endsWith(src)) s.src = src;
         const tx = (0.5 + ((base.offset[0] - layout.offset[0]) / base.span[0] - 0.5) * z) * W;
@@ -380,15 +398,17 @@ export function BusStop({ flying, entered }: Props) {
     sounds.rain ??= createRainSound();
     gsap.to(S, { rainFall: 0.85, duration: 3, ease: 'sine.out' });
     if (!pictureReady) {
-      gsap.to(S, { light: 0.35, duration: 6, ease: ease.scenery });
-      return;
+      gsap.to(S, { light: 0.35, duration: 3, ease: ease.scenery });
+      // never wait long: after 3 s, go on with the still picture
+      const id = window.setTimeout(() => setPictureReady(true), 3000);
+      return () => clearTimeout(id);
     }
-    const tl = gsap.timeline({ onComplete: () => { sounds.wind?.stop(1.5); sounds.wind = undefined; setArrived(true); } });
-    tl.to(S, { light: 1, duration: 7, ease: ease.scenery, overwrite: 'auto' }, 0)
-      .to(S, { travel: 0.6, duration: 5, ease: ease.scenery }, 0)
-      .to(S, { travel: 8.2, duration: 11, ease: ease.scenery }, 5)
-      .to(S, { haze: 0, duration: 6, ease: ease.scenery }, 5.6)
-      .set(S, { fogGone: true }, 16);
+    // the flight through the fog: about 7 seconds
+    const tl = gsap.timeline({ onComplete: () => { sounds.wind?.stop(1.2); sounds.wind = undefined; setArrived(true); } });
+    tl.to(S, { light: 1, duration: 3, ease: ease.scenery, overwrite: 'auto' }, 0)
+      .to(S, { travel: 8.2, duration: 6.8, ease: 'sine.inOut' }, 0)
+      .to(S, { haze: 0, duration: 4, ease: ease.scenery }, 2.6)
+      .set(S, { fogGone: true }, 7);
     const windLoop = () => sounds.wind?.setLevel(0.18 * S.haze + 0.5 * clamp(1 - Math.abs(S.travel - 4) / 4));
     gsap.ticker.add(windLoop);
     if (prefersReducedMotion()) tl.timeScale(2);
@@ -765,7 +785,7 @@ export function BusStop({ flying, entered }: Props) {
     <section className="scene stop" aria-label="The bus stop">
       <video ref={film} className="stop__film" src={filmUrl} playsInline preload="auto" aria-hidden="true" />
       <div className="layer" aria-hidden="true">
-        <img ref={still} className="layer stop__still" src={emptyUrl} alt="" hidden={!noStage} />
+        <img ref={still} className="layer stop__still" src={emptyUrl} alt="" />
         <canvas ref={stageCanvas} className="layer" hidden={noStage} />
         <canvas ref={lifeCanvas} className="layer" />
       </div>

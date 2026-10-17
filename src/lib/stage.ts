@@ -315,7 +315,18 @@ export class Stage {
     gl.bindVertexArray(gl.createVertexArray());
   }
 
+  private W = 1;
+  private H = 1;
+
+  /** Lower (or raise) the drawing resolution, e.g. on a slow device. */
+  setMaxDpr(v: number): void {
+    this.maxDpr = v;
+    this.resize(this.W, this.H);
+  }
+
   resize(W: number, H: number): void {
+    this.W = W;
+    this.H = H;
     const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr);
     this.canvas.width = Math.max(1, Math.round(W * dpr));
     this.canvas.height = Math.max(1, Math.round(H * dpr));

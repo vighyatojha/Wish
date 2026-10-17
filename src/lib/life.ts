@@ -159,10 +159,12 @@ export class Life {
     return c;
   }
 
+  maxDpr = 1.75;
+
   resize(W: number, H: number) {
     this.W = W;
     this.H = H;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 1.75);
+    this.dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr);
     this.canvas.width = Math.round(W * this.dpr);
     this.canvas.height = Math.round(H * this.dpr);
   }

@@ -17,6 +17,10 @@ import { SplitText } from 'gsap/SplitText';
 import { useGSAP } from '@gsap/react';
 
 gsap.registerPlugin(ScrollTrigger, SplitText, useGSAP);
+// Keep every animation on the real clock. By default GSAP slows its clock
+// down when frames are very slow, which on a struggling device could stretch
+// a few seconds of fog into minutes; here the story always moves on time.
+gsap.ticker.lagSmoothing(0);
 
 export const ease = {
   enter: 'power2.out',
