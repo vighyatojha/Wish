@@ -60,7 +60,8 @@ const STEP_DOWN: Vec2 = [DOOR_X + 0.012, 0.736];
 const EXIT_SIZE = 0.085;   // an animal's height in the doorway, share of the picture height
 const STOP_FPS = 8;        // stop-motion frame rate
 // how dark it gets after each animal: golden hour, sunset, blue hour, dusk, night
-const NIGHTS = [1, 2, 3, 3.65, 4];
+// Day-to-night is a scene clock, not a reward timer: note reading and animal pacing never control it.
+const DAY_NIGHT_SECONDS = 180;
 
 const CARDS = content.animals;
 const NAME = content.name.toUpperCase();
@@ -162,6 +163,7 @@ export function BusStop({ flying, entered }: Props) {
   const vignette = useRef<HTMLDivElement>(null);
   const flash = useRef<HTMLDivElement>(null);
   const note = useRef<NoteHandle>(null);
+  const noteReading = useRef(false);
   const lifeRef = useRef<Life | null>(null);
   const stageRef = useRef<Stage | null>(null);
   const debug = useRef<HTMLPreElement>(null);
@@ -470,8 +472,9 @@ export function BusStop({ flying, entered }: Props) {
       }
 
       // ── life, rain, fog ──
-      life.amount.garden = S.garden;
-      life.amount.fore = S.fore;
+      // Keep decorative 2D butterflies out of the reading layer; the background stays alive.
+      life.amount.garden = noteReading.current ? 0 : S.garden;
+      life.amount.fore = noteReading.current ? 0 : S.fore;
       life.amount.birds = S.birds;
       life.amount.fireflies = S.fireflies;
       life.frame(time, dt, map, ppp);
@@ -619,8 +622,12 @@ export function BusStop({ flying, entered }: Props) {
     }
 
     if (skip !== 'question') {
+      // Start the full day-to-night cycle as soon as the bus has arrived.
+      // It runs for three minutes regardless of how long each note is read.
+      startDayNightCycle();
       for (let i = 0; i < CARDS.length; i++) await visit(i);
-      gsap.to(S, { fireflies: 1, duration: 3.5, ease: 'sine.inOut' });
+      // Let the twilight-to-firefly transition breathe before the final question,
+      // but do not make the clock wait for the animals or their notes.
       await wait(2.5);
     } else {
       Object.assign(S, { night: 4, garden: 0, fore: 0, birds: 0, fireflies: 1, lamp: 1 });
@@ -628,6 +635,21 @@ export function BusStop({ flying, entered }: Props) {
       sounds.crickets.setLevel(1);
     }
     await question();
+  }
+
+  function startDayNightCycle() {
+    const crickets = (sounds.crickets ??= createCrickets());
+    crickets.setLevel(0);
+    const cricketLevel = { value: 0 };
+    const tl = gsap.timeline();
+    tl.to(S, { night: 4, duration: DAY_NIGHT_SECONDS, ease: 'none' }, 0)
+      // Evening arrives gradually; butterflies retreat before the fireflies appear.
+      .to(S, { garden: 0, fore: 0, birds: 0, duration: 26, ease: 'sine.inOut' }, 96)
+      .to(S, { fireflies: 1, duration: 24, ease: 'sine.inOut' }, 108)
+      .to(S, { lamp: 1, duration: 9, ease: 'sine.inOut' }, 111)
+      .to(cricketLevel, { value: 1, duration: 22, ease: 'sine.inOut', onUpdate: () => crickets.setLevel(cricketLevel.value) }, 112)
+      .call(fadeBirdsong, [], 96);
+    if (prefersReducedMotion()) tl.timeScale(2);
   }
 
   function startBirdsong() {
@@ -867,29 +889,15 @@ export function BusStop({ flying, entered }: Props) {
     const held = rig().querySelector<SVGGElement>('[data-part="scroll"]')!;
     const rect = held.getBoundingClientRect();
     held.style.visibility = 'hidden';
+    noteReading.current = true;
     await note.current!.open(rect).then(live);
     await tapNote();
     buzz(8);
     await note.current!.close().then(live);
+    noteReading.current = false;
     gsap.to(a, { offer: 0, head: 0, duration: 0.4, ease: 'sine.inOut' });
 
-    // …and dissolves into golden dust; the day moves on
-    gsap.to(S, { night: NIGHTS[i], duration: 5, ease: 'sine.inOut' });
-    if (i === 1) {
-      gsap.to(S, { birds: 0.5, duration: 4 });
-      // the street lamp flickers on as the sun goes down
-      gsap.timeline({ delay: 3.6 })
-        .to(S, { lamp: 0.6, duration: 0.08 }).to(S, { lamp: 0.1, duration: 0.1 })
-        .to(S, { lamp: 0.8, duration: 0.08 }).to(S, { lamp: 0.3, duration: 0.12 })
-        .to(S, { lamp: 1, duration: 0.6, ease: 'sine.out' });
-    }
-    if (i === 2) { gsap.to(S, { garden: 0, duration: 4 }); fadeBirdsong(); }
-    if (i === 3) {
-      gsap.to(S, { birds: 0, fore: 0, duration: 4 });
-      const c = (sounds.crickets ??= createCrickets());
-      const lvl = { v: 0 };
-      gsap.to(lvl, { v: 1, duration: 5, onUpdate: () => c.setLevel(lvl.v) });
-    }
+    // The environment clock runs independently; note completion only triggers the character dissolve.
     await dissolve(i);
   }
 
