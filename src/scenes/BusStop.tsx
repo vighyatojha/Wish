@@ -802,7 +802,8 @@ export function BusStop({ flying, entered }: Props) {
       await wait(Math.max(0, 4.3 - v.currentTime));
       playAirRelease(1.4, 0.38);
       await wait(Math.max(0, 6.2 - v.currentTime));
-      gsap.to(S.weights, { 1: 0, 2: 1, duration: 0.5, ease: 'none' });
+      // Blend the moving bus into the painted parked bus slowly to avoid a ghost/double-image pop.
+    gsap.to(S.weights, { 1: 0, 2: 1, duration: 1.05, ease: 'sine.inOut' });
       gsap.to(v, { volume: 0, duration: 0.9, ease: 'sine.in', onComplete: () => v.pause() });
       await wait(0.6);
       return;
