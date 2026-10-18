@@ -17,7 +17,7 @@ const skipTo = new URLSearchParams(location.search).get('scene');
 
 export function App() {
   if (skipTo === 'gallery') return <Gallery />;
-  const jump = ['stop', 'pluck', 'bus', 'animals', 'question'].includes(skipTo ?? '');
+  const jump = ['stop', 'pluck', 'bus', 'animals', 'question', 'bouquet'].includes(skipTo ?? '');
   const [showIntro, setShowIntro] = useState(!jump);
   const [showSunrise, setShowSunrise] = useState(jump);
   const [flying, setFlying] = useState(jump);

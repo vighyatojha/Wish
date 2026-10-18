@@ -357,3 +357,59 @@
 @media (prefers-reduced-motion: reduce) {
   .stop__finale.is-on .stop__finale-hb, .stop__finale.is-on .stop__finale-name, .stop__finale.is-on .stop__finale-msg { animation-duration: 0.6s; filter: none; }
 }
+
+/* ── the countdown to the last surprise ── */
+.stop__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 1.3rem 0 0;
+  padding: 0.35rem 0.95rem 0.35rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(16, 20, 40, 0.42);
+  border: 1px solid rgba(255, 226, 160, 0.3);
+  animation: stop-msg-in 0.8s ease both;
+  position: relative;
+}
+.stop__count svg { width: 34px; height: 34px; transform: rotate(-90deg); }
+.stop__count circle { fill: none; stroke-width: 2.4; }
+.stop__count-track { stroke: rgba(255, 226, 160, 0.18); }
+.stop__count-ring { stroke: #ffd98a; stroke-linecap: round; stroke-dasharray: 106.8; stroke-dashoffset: 0; animation: stop-count 10s linear forwards; }
+@keyframes stop-count { to { stroke-dashoffset: 106.8; } }
+.stop__count-n {
+  position: absolute;
+  left: 0.4rem;
+  width: 34px;
+  text-align: center;
+  font: 500 1rem / 1 'EB Garamond', Georgia, serif;
+  font-variant-numeric: tabular-nums;
+  color: #fff3d6;
+}
+.stop__count-label { font: italic 400 1.05rem / 1 'EB Garamond', Georgia, serif; color: #f4ead6; }
+
+/* ── the bouquet ── */
+.stop__bq-veil {
+  opacity: 0;
+  pointer-events: none;
+  background: #000;
+}
+.stop__bouquet { visibility: hidden; pointer-events: none; }
+.stop__garden {
+  position: absolute;
+  left: 50%;
+  top: calc(5svh + env(safe-area-inset-top));
+  width: min(94vw, 760px);
+  height: 30svh;
+  transform: translateX(-50%);
+  visibility: hidden;
+  pointer-events: none;
+}
+.stop__replay {
+  position: absolute;
+  right: calc(16px + env(safe-area-inset-right));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  margin: 0;
+}
+@media (min-aspect-ratio: 1/1) {
+  .stop__garden { top: calc(1svh + env(safe-area-inset-top)); height: 26svh; }
+}

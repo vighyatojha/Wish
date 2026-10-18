@@ -39,6 +39,8 @@ import {
 } from '../lib/audio';
 import { dayLook, formatHour, DAY_START, DAY_END, SECONDS_PER_HOUR, type DayLook } from '../lib/clock';
 import { norm, type V3 } from '../lib/wings';
+import { Bloom, loadFlower, type FlowerKind } from '../lib/bloom';
+import { TypeGarden } from '../lib/typegarden';
 import { saveResponse } from '../lib/firebase';
 import { Fog } from '../lib/fog';
 import { Rain } from '../lib/rain';
@@ -193,6 +195,8 @@ export function BusStop({ flying, entered }: Props) {
   const flash = useRef<HTMLDivElement>(null);
   const note = useRef<NoteHandle>(null);
   const lifeRef = useRef<Life | null>(null);
+  const bouquetRef = useRef<Bloom | null>(null);
+  const gardenRef = useRef<TypeGarden | null>(null);
   const stageRef = useRef<Stage | null>(null);
   const debug = useRef<HTMLPreElement>(null);
   const mapRef = useRef<{ map: (uv: Vec2) => Vec2; ppp: number; W: number; H: number }>({ map: (u) => u, ppp: 1, W: 1, H: 1 });
@@ -214,6 +218,11 @@ export function BusStop({ flying, entered }: Props) {
   const clockText = useRef<HTMLSpanElement>(null);
   const clockIcon = useRef<SVGGElement>(null);
   const finaleEl = useRef<HTMLDivElement>(null);
+  const answerRef = useRef<FlowerKind>('Tulip');
+  const bouquetCanvas = useRef<HTMLCanvasElement>(null);
+  const bouquetVeil = useRef<HTMLDivElement>(null);
+  const gardenCanvas = useRef<HTMLCanvasElement>(null);
+  const [count, setCount] = useState(-1);
   // one sound switch for everything (the film and birdsong play outside the sound engine)
   useEffect(() => onMute((m) => {
     setMutedState(m);
@@ -580,6 +589,8 @@ export function BusStop({ flying, entered }: Props) {
       window.removeEventListener('pointerdown', onSky, true);
       stage?.destroy();
       fog?.destroy();
+      bouquetRef.current?.destroy();
+      gardenRef.current?.destroy();
       rain.destroy();
       sounds.rain?.stop(0.5);
       sounds.wind?.stop(0.5);
@@ -594,7 +605,7 @@ export function BusStop({ flying, entered }: Props) {
 
   // ── The flight through the fog, in the rain ─────────────────
   useGSAP(() => {
-    if (!flying || skip === 'pluck' || skip === 'bus' || skip === 'animals' || skip === 'question') return;
+    if (!flying || skip === 'pluck' || skip === 'bus' || skip === 'animals' || skip === 'question' || skip === 'bouquet') return;
     sounds.wind ??= createWindSound();
     sounds.rain ??= createRainSound();
     gsap.to(S, { rainFall: 0.85, duration: 3, ease: 'sine.out' });
@@ -623,7 +634,7 @@ export function BusStop({ flying, entered }: Props) {
   // ── The story, step by step ─────────────────────────────────
   const started = useRef(false);
   useEffect(() => {
-    const jump = skip === 'pluck' || skip === 'bus' || skip === 'animals' || skip === 'question';
+    const jump = skip === 'pluck' || skip === 'bus' || skip === 'animals' || skip === 'question' || skip === 'bouquet';
     if (started.current || !pictureReady || !(jump || (arrived && entered))) return;
     started.current = true;
     story().catch((e) => { if (!(e instanceof Cancelled)) console.error(e); });
@@ -641,15 +652,22 @@ export function BusStop({ flying, entered }: Props) {
 
   async function story() {
     const reduced = prefersReducedMotion();
-    if (skip === 'pluck' || skip === 'bus' || skip === 'animals' || skip === 'question') {
+    if (skip === 'pluck' || skip === 'bus' || skip === 'animals' || skip === 'question' || skip === 'bouquet') {
       Object.assign(S, { haze: 0, travel: 8.2, light: 1, fogGone: true, rain: 0, rainFall: 0, wind: 0.35, cloud: 1, tulip: 1, bloom: 1 });
     }
-    if (skip === 'bus' || skip === 'animals' || skip === 'question') Object.assign(S, { tulip: 0, garden: 1, birds: 1 });
-    if (skip === 'animals' || skip === 'question') { S.weights = [0, 0, 1]; S.door = 1; }
+    if (skip === 'bus' || skip === 'animals' || skip === 'question' || skip === 'bouquet') Object.assign(S, { tulip: 0, garden: 1, birds: 1 });
+    if (skip === 'animals' || skip === 'question' || skip === 'bouquet') { S.weights = [0, 0, 1]; S.door = 1; }
     // the day begins (when jumping straight to a step, at that step's hour)
-    S.hour = ({ pluck: 7.2, bus: BUS_HOUR - 0.15, animals: ANIMAL_HOURS[0], question: QUESTION_HOUR } as Record<string, number>)[skip ?? ''] ?? DAY_START;
+    S.hour = ({ pluck: 7.2, bus: BUS_HOUR - 0.15, animals: ANIMAL_HOURS[0], question: QUESTION_HOUR, bouquet: DAY_END } as Record<string, number>)[skip ?? ''] ?? DAY_START;
     S.clock = true;
     setUi((u) => ({ ...u, clock: true }));
+    if (skip === 'bouquet') {
+      // (for building: ?scene=bouquet&flower=Lily goes straight to the last gift)
+      const f = new URLSearchParams(location.search).get('flower');
+      await wait(1.5);
+      await bouquet(f === 'Lily' || f === 'Lotus' ? f : 'Tulip');
+      return;
+    }
 
     if (!skip || skip === 'stop' || skip === 'pluck') {
       if (!skip || skip === 'stop') {
@@ -1033,6 +1051,8 @@ export function BusStop({ flying, entered }: Props) {
     await wait(n * 0.18 + 0.6);
     setUi((u) => ({ ...u, question: true }));
     const answer = await chosen();
+    answerRef.current = (['Tulip', 'Lily', 'Lotus'].includes(answer) ? answer : 'Tulip') as FlowerKind;
+    void loadFlower(answerRef.current); // (her flower's picture, ready well before it's needed)
     playChime();
     buzz(15);
     setUi((u) => ({ ...u, answer }));
@@ -1064,7 +1084,50 @@ export function BusStop({ flying, entered }: Props) {
     // the message appears just below the moon
     finaleEl.current?.style.setProperty('--top', `${Math.min(H * 0.42, my * H + r * 1.25)}px`);
     setUi((u) => ({ ...u, finale: true }));
-    await wait(Math.max(16, tune + 2));
+    // once the message has fully appeared: ten seconds, then her flower
+    await wait(Math.max(7, tune * 0.5));
+    for (let n = 10; n > 0; n--) { setCount(n); await wait(1); }
+    setCount(0);
+    await bouquet(answerRef.current);
+  }
+
+  // ── her flower: the screen goes black; from a seed and its roots, a bunch of her flowers grows ──
+  async function bouquet(kind: FlowerKind) {
+    const { W, H } = mapRef.current;
+    const art = loadFlower(kind);
+    // everything fades into black
+    if (finaleEl.current) gsap.to(finaleEl.current, { autoAlpha: 0, y: -24, duration: 1.2, ease: ease.exit });
+    gsap.to(svg.current, { opacity: 0, duration: 1.4, ease: 'sine.inOut' });
+    gsap.to('.stop__clock', { autoAlpha: 0, duration: 1.2 });
+    await play(gsap.to(bouquetVeil.current, { opacity: 1, duration: 2, ease: 'sine.inOut' }));
+    setUi((u) => ({ ...u, finale: false }));
+    await wait(0.6);
+    const canvas = bouquetCanvas.current!;
+    canvas.style.visibility = 'visible';
+    const bq = new Bloom(canvas, await art.then(live));
+    bq.resize(W, H);
+    const onResize = () => bq.resize(window.innerWidth, window.innerHeight);
+    window.addEventListener('resize', onResize);
+    let blooms = 0;
+    bq.onCue = (c) => {
+      if (c === 'land') playPop(0.6);
+      else if (blooms++ === 0) playShimmer(2.6); else playPop(1.2 + Math.random() * 0.4);
+    };
+    bouquetRef.current = bq;
+    await bq.play().then(live);
+    // her name grows out of the dark, in a garden of letters
+    await wait(0.4);
+    const gc = gardenCanvas.current!;
+    gc.style.visibility = 'visible';
+    await document.fonts.load('700 100px "Playfair Display"').catch(() => {});
+    // (in the flowers' blue: blue roses, deep teal stems, white letters)
+    const tg = new TypeGarden(gc, { palette: ['night', 'transparent', '#3f86ff', '#2a7fa8', '#cfe6ff', '#f2f7ff', '#04101c'], transparent: true, interactive: false, caret: true, scale: 0.3, density: 0.7, legible: true, maxDpr: 2, font: '"Playfair Display",Georgia,serif' });
+    gardenRef.current = tg;
+    tg.start();
+    for (const ch of content.finale.gardenWords) { tg.type(ch); await wait(ch === ' ' ? 0.32 : 0.2); }
+    await wait(1.2);
+    tg.opts.caret = false;
+    await wait(3);
     setUi((u) => ({ ...u, replay: true }));
   }
 
@@ -1220,10 +1283,25 @@ export function BusStop({ flying, entered }: Props) {
           <span className="stop__finale-name">{content.name}</span>
         </h2>
         <p className="stop__finale-msg">{content.finale.message}</p>
-        {ui.replay && (
-          <button type="button" className="stop__replay" onClick={() => location.assign(location.pathname)}>{content.finale.replay}</button>
+        {count > 0 && (
+          <p className="stop__count" aria-live="off">
+            <svg viewBox="0 0 40 40" aria-hidden="true">
+              <circle cx="20" cy="20" r="17" className="stop__count-track" />
+              <circle cx="20" cy="20" r="17" className="stop__count-ring" />
+            </svg>
+            <span className="stop__count-n">{count}</span>
+            <span className="stop__count-label">{content.finale.countdown}</span>
+          </p>
         )}
       </div>
+
+      {/* her flower, grown into a bouquet; then her name in a garden of letters */}
+      <div ref={bouquetVeil} className="layer stop__bq-veil" aria-hidden="true" />
+      <canvas ref={bouquetCanvas} className="layer stop__bouquet" aria-hidden="true" />
+      <canvas ref={gardenCanvas} className="stop__garden" aria-label={content.finale.gardenWords} role="img" />
+      {ui.replay && (
+        <button type="button" className="stop__replay" onClick={() => location.assign(location.pathname)}>{content.finale.replay}</button>
+      )}
 
       {/* the time of day, and the sound switch */}
       {ui.clock && (

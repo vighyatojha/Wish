@@ -96,6 +96,10 @@ export const content = {
     title: 'Happy Birthday',
     message: 'From the first light of the morning to the last firefly of the night, this whole day was for you. May your year be just as bright.',
     replay: 'Watch it again',
+    // ten seconds after the message, the screen goes black and her favourite flower grows, a whole bunch of it
+    countdown: 'one more surprise',
+    // …and these words grow out of the dark above it, with roses on their letters
+    gardenWords: 'for Varsha',
   },
 
   // The small round button in the corner

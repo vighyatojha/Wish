@@ -6,6 +6,7 @@ import '@fontsource/im-fell-english/400.css';
 import '@fontsource/im-fell-english-sc/400.css';
 import '@fontsource/patrick-hand/400.css';
 import '@fontsource/dancing-script/600.css';
+import '@fontsource/playfair-display/latin-700.css';
 import './styles/global.css';
 import { App } from './App';
 
