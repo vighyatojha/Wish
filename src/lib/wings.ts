@@ -100,18 +100,19 @@ const baseWing = (i: number) => (base[i] ??= paintWing(WING_COLORS[i]));
 // Lit versions: the wing multiplied by a colour (the light of the hour × how the wing faces the sun).
 const lit = new Map<string, HTMLCanvasElement>();
 function litWing(i: number, r: number, gg: number, b: number): HTMLCanvasElement {
-  const q = (v: number) => Math.round(Math.min(1.6, Math.max(0, v)) * 20); // 0.05 steps
+  // (coarse steps, so a handful of lit versions are reused rather than painted every frame)
+  const q = (v: number) => Math.round(Math.min(1.6, Math.max(0, v)) * 12.5); // 0.08 steps
   const key = `${i}|${q(r)}|${q(gg)}|${q(b)}`;
   let c = lit.get(key);
   if (c) return c;
-  if (lit.size > 400) lit.clear();
+  if (lit.size > 500) lit.delete(lit.keys().next().value!); // forget the oldest
   const src = baseWing(i);
   c = document.createElement('canvas');
   c.width = src.width;
   c.height = src.height;
   const g = c.getContext('2d')!;
   g.drawImage(src, 0, 0);
-  const R = q(r) / 20, G = q(gg) / 20, B = q(b) / 20;
+  const R = q(r) / 12.5, G = q(gg) / 12.5, B = q(b) / 12.5;
   // multiply (for darker than 1), then add (for brighter, e.g. the sun shining through)
   g.globalCompositeOperation = 'multiply';
   g.fillStyle = `rgb(${Math.min(255, R * 255) | 0},${Math.min(255, G * 255) | 0},${Math.min(255, B * 255) | 0})`;
