@@ -317,15 +317,25 @@ export class Stage {
   broken = '';
   /** for the ?debug panel */
   stats = { renderer: '', glError: 0, probe: '', frames: 0, blackProbes: 0 };
+  /** true once a drawn frame has been checked and is a real picture (not black): only then is it shown */
+  ready = false;
+  private firstFrameAt = 0;
   private probeBuf = new Uint8Array(4 * 3);
   private lastProbe = 0;
 
   /** Returns null when the phone has no WebGL2 (the still picture is shown instead). */
   static async create(canvas: HTMLCanvasElement, pics: StagePictures, video: HTMLVideoElement, maxDpr = 1.5): Promise<Stage | null> {
+    // (the pictures first: the drawing surface is only made once there is something to draw)
+    let imgs: HTMLImageElement[];
+    try {
+      imgs = await Promise.all([pics.empty, pics.bus, pics.masks, pics.masks2, pics.lamp, pics.moon].map(loadImage));
+    } catch (err) {
+      console.warn('Animated background unavailable (a picture did not load), showing the still picture:', err);
+      return null;
+    }
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false });
     if (!gl) return null;
     try {
-      const imgs = await Promise.all([pics.empty, pics.bus, pics.masks, pics.masks2, pics.lamp, pics.moon].map(loadImage));
       return new Stage(canvas, gl, pics, imgs, video, maxDpr);
     } catch (err) {
       console.warn('Animated background unavailable, showing the still picture:', err);
@@ -436,7 +446,9 @@ export class Stage {
     // on this device, and the scene switches to the still pictures.
     this.stats.frames++;
     const now = performance.now();
-    if (now - this.lastProbe > 1000) {
+    if (!this.firstFrameAt) this.firstFrameAt = now;
+    // until it's proven to draw, check every frame; after that, about once a second
+    if (!this.ready || now - this.lastProbe > 1000) {
       this.lastProbe = now;
       const err = gl.getError();
       if (err) this.stats.glError = err;
@@ -451,6 +463,11 @@ export class Stage {
         out.push(`${b[0]},${b[1]},${b[2]}`);
       });
       this.stats.probe = out.join(' · ');
+      if (!this.ready) {
+        if (sum >= 30) this.ready = true;
+        else if (now - this.firstFrameAt > 4000) this.broken = `never drew a picture (gl error ${err || 'none'})`;
+        return;
+      }
       if (sum < 6 && f.night < 3.2 && f.blur < 3) {
         this.stats.blackProbes++;
         if (this.stats.blackProbes >= 2) this.broken = `picture came out black (gl error ${err || 'none'})`;

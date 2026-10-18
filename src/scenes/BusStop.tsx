@@ -41,14 +41,7 @@ import { ButterflyArt, ButterflyRig, TulipArt, TulipRig, TULIP_TOP, TULIP_HEAD }
 import { AnimalArt, AnimalRig, ANIMAL_FEET } from '../components/Animals';
 import { Note, type NoteHandle } from '../components/Note';
 import { FairyArt, FairyRig, FAIRIES } from '../components/Fairy';
-import emptyUrl from '../assets/stop-empty.webp';
-import busUrl from '../assets/stop-bus.webp';
-import masksUrl from '../assets/stop-masks.png';
-import masks2Url from '../assets/stop-masks2.png';
-import filmUrl from '../assets/bus-arrives.mp4';
-import birdsongUrl from '../assets/birdsong.m4a';
-import lampUrl from '../assets/street-lamp.png';
-import moonUrl from '../assets/moon.png';
+import { loadedPictures, loadedFilm, loadedBirdsong, onProgress, progress, type Pictures } from '../lib/preload';
 import './busstop.css';
 
 const PIC_W = 1611, PIC_H = 906;
@@ -181,6 +174,10 @@ export function BusStop({ flying, entered }: Props) {
   const [pictureReady, setPictureReady] = useState(false);
   const [noStage, setNoStage] = useState(false);
   const [noFog, setNoFog] = useState(false);
+  // a gentle loading card in the fog while page 2's pictures (or later the bus film) are still arriving
+  const [loading, setLoading] = useState<null | 'scene' | 'bus'>(null);
+  const [loaded, setLoaded] = useState({ pictures: 0, film: 0 });
+  const pics = useRef<Pictures | null>(null);
   const [noteIndex, setNoteIndex] = useState(0);
   const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', bird: false, moon: false, go: false });
 
@@ -206,6 +203,7 @@ export function BusStop({ flying, entered }: Props) {
     let cancelled = false;
     let raf = 0;
     let stage: Stage | null = null;
+    let brokenReason = '';
     const fog = Fog.create(fogCanvas.current!);
     if (!fog) setNoFog(true);
     const life = new Life(lifeCanvas.current!, frontCanvas.current!);
@@ -249,19 +247,41 @@ export function BusStop({ flying, entered }: Props) {
     resize();
     window.addEventListener('resize', resize);
 
-    void Stage.create(stageCanvas.current!, { empty: emptyUrl, bus: busUrl, masks: masksUrl, masks2: masks2Url, lamp: lampUrl, moon: moonUrl, width: PIC_W, height: PIC_H }, film.current!)
-      .then((s) => {
-        if (cancelled) return s?.destroy();
-        if (!s) setNoStage(true);
-        else {
-          stage = s;
-          stageRef.current = s;
-          stage.resize(W, H);
-          // (for testing the fallback: ?stagefail)
-          if (new URLSearchParams(location.search).has('stagefail')) s.broken = 'simulated for testing';
-        }
-        setPictureReady(true);
-      });
+    // The scene is only revealed once its pictures have arrived and been drawn
+    // (or, if animated drawing fails, the still picture is ready). Never black.
+    let stillMode = false;      // drawing with the plain <img> instead of WebGL
+    let stageShown = false;
+    let announced = false;
+    const announce = () => { if (!announced && !cancelled) { announced = true; setPictureReady(true); } };
+    const useStill = (why: string) => {
+      if (why) console.warn('[stage] using the still pictures:', why);
+      brokenReason = why;
+      stage = null;
+      stageRef.current = null;
+      stillMode = true;
+      setNoStage(true);
+      announce();
+    };
+    void loadedPictures().then(async (p) => {
+      if (cancelled) return;
+      pics.current = p;
+      still.current!.src = p.empty;
+      const s = await Stage.create(stageCanvas.current!, { ...p, width: PIC_W, height: PIC_H }, film.current!);
+      if (cancelled) return s?.destroy();
+      if (!s) return useStill('');
+      stage = s;
+      stageRef.current = s;
+      stage.resize(W, H);
+      // (for testing the fallback: ?stagefail)
+      if (new URLSearchParams(location.search).has('stagefail')) s.broken = 'simulated for testing';
+    });
+    // the bus film and the birdsong arrive later (after the pictures)
+    void loadedFilm().then((u) => {
+      const v = film.current;
+      if (cancelled || !v) return;
+      v.src = u;
+      v.load();
+    });
 
     // if the device is struggling, draw at a lower resolution until it keeps up
     const QUALITY = [1.5, 1.1, 0.8, 0.6];
@@ -278,7 +298,6 @@ export function BusStop({ flying, entered }: Props) {
       }
     };
 
-    let brokenReason = '';
     // ── ?debug: a small panel showing what the graphics are doing ──
     let debugTick = 0;
     const debugPanel = debug.current;
@@ -288,7 +307,7 @@ export function BusStop({ flying, entered }: Props) {
       const st = stage?.stats;
       debugPanel.textContent = [
         `renderer: ${st?.renderer ?? '—'}`,
-        `background: ${stage ? 'animated (WebGL2)' : `still pictures${brokenReason ? ` — ${brokenReason}` : ''}`}`,
+        `background: ${stage ? (stage.ready ? 'animated (WebGL2)' : 'animated, checking first frame') : stillMode ? `still pictures${brokenReason ? ` — ${brokenReason}` : ''}` : `loading pictures ${Math.round(progress().pictures * 100)}%`}`,
         `self-check pixels: ${st?.probe ?? '—'}  black: ${st?.blackProbes ?? 0}  gl error: ${st?.glError ?? 0}`,
         `fps: ${fps.toFixed(0)}  quality: ${QUALITY[quality]}  size: ${W}×${H} @${window.devicePixelRatio}`,
         `story: night ${S.night.toFixed(2)} rain ${S.rain.toFixed(2)} haze ${S.haze.toFixed(2)} weights ${S.weights.map((x) => x.toFixed(2)).join('/')}`,
@@ -421,25 +440,28 @@ export function BusStop({ flying, entered }: Props) {
       let focus: { x: number; y: number; sharp: number; soft: number } | undefined;
       if (S.focus > 0.001) focus = { x: headScreen[0], y: headScreen[1] - 0.03, sharp: 0.16, soft: 0.5 };
       if (stage && stage.broken) {
-        console.warn('[stage] switching to the still pictures:', stage.broken);
-        brokenReason = stage.broken;
-        stage = null;
-        stageRef.current = null;
-        setNoStage(true);
+        stage.destroy();
+        useStill(stage.broken);
       }
       if (stage) {
         stage.render({
           time, layout, zoom: z, zoomCenter: center, blur: S.blur, focus,
           weights: S.weights, rain: S.rain, night: S.night, door: S.door, wind: S.wind, cloud: S.cloud, lamp: S.lamp,
         });
-      } else if (still.current) {
+        // shown only once a frame has been checked and is a real picture
+        if (stage.ready && !stageShown) {
+          stageShown = true;
+          stageCanvas.current!.style.opacity = '1';
+          announce();
+        }
+      } else if (stillMode && still.current && pics.current) {
         const s = still.current;
         s.style.visibility = 'visible';
         const fv = film.current!;
         fv.classList.add('is-shown');
         fv.style.opacity = S.weights[1].toFixed(3);
-        const src = S.weights[2] > 0.5 ? busUrl : emptyUrl;
-        if (!s.src.endsWith(src)) s.src = src;
+        const src = S.weights[2] > 0.5 ? pics.current.bus : pics.current.empty;
+        if (s.src !== src) s.src = src;
         const tx = (0.5 + ((base.offset[0] - layout.offset[0]) / base.span[0] - 0.5) * z) * W;
         const ty = (0.5 + ((base.offset[1] - layout.offset[1]) / base.span[1] - 0.5) * z) * H;
         s.style.transformOrigin = '0 0';
@@ -501,6 +523,9 @@ export function BusStop({ flying, entered }: Props) {
     };
   }, [S, actors, sounds]);
 
+  // how far along the downloads are (for the loading card)
+  useEffect(() => (loading ? onProgress(setLoaded) : undefined), [loading]);
+
   // ── The flight through the fog, in the rain ─────────────────
   useGSAP(() => {
     if (!flying || skip === 'pluck' || skip === 'bus' || skip === 'animals' || skip === 'question') return;
@@ -508,16 +533,19 @@ export function BusStop({ flying, entered }: Props) {
     sounds.rain ??= createRainSound();
     gsap.to(S, { rainFall: 0.85, duration: 3, ease: 'sine.out' });
     if (!pictureReady) {
-      gsap.to(S, { light: 0.35, duration: 3, ease: ease.scenery });
-      // never wait long: after 3 s, go on with the still picture
-      const id = window.setTimeout(() => setPictureReady(true), 3000);
+      // the pictures are still on their way: the fog glows and drifts gently,
+      // and (if it takes more than a moment) a loading card appears in it
+      gsap.to(S, { light: 0.5, duration: 3, ease: ease.scenery });
+      gsap.to(S, { travel: 1.2, duration: 40, ease: 'sine.out' });
+      const id = window.setTimeout(() => setLoading('scene'), 700);
       return () => clearTimeout(id);
     }
+    setLoading(null);
     // the flight through the fog: about 7 seconds (4.5 on a phone)
     const k = window.innerWidth / window.innerHeight < 1 ? 0.64 : 1;
     const tl = gsap.timeline({ onComplete: () => { sounds.wind?.stop(1.2); sounds.wind = undefined; setArrived(true); } });
     tl.to(S, { light: 1, duration: 3 * k, ease: ease.scenery, overwrite: 'auto' }, 0)
-      .to(S, { travel: 8.2, duration: 6.8 * k, ease: 'sine.inOut' }, 0)
+      .to(S, { travel: 8.2, duration: 6.8 * k, ease: 'sine.inOut', overwrite: 'auto' }, 0)
       .to(S, { haze: 0, duration: 4 * k, ease: ease.scenery }, 2.6 * k)
       .set(S, { fogGone: true }, 7 * k);
     const windLoop = () => sounds.wind?.setLevel(0.18 * S.haze + 0.5 * clamp(1 - Math.abs(S.travel - 4) / 4));
@@ -603,10 +631,32 @@ export function BusStop({ flying, entered }: Props) {
   }
 
   function startBirdsong() {
-    const a = (sounds.birdsong ??= new Audio(birdsongUrl));
-    a.loop = true;
-    a.volume = 0;
-    a.play().then(() => gsap.to(a, { volume: 0.55, duration: 4, ease: ease.scenery })).catch(() => {});
+    // (it downloads after the bus film; it fades in whenever it arrives)
+    void loadedBirdsong().then((src) => {
+      if (!alive.current || sounds.birdsong) return;
+      const a = (sounds.birdsong = new Audio(src));
+      a.loop = true;
+      a.volume = 0;
+      a.play().then(() => gsap.to(a, { volume: 0.55, duration: 4, ease: ease.scenery })).catch(() => {});
+    });
+  }
+
+  /** The bus film must be ready to play before the bus can come; on a slow connection, wait for it (with the loading card). */
+  async function filmReady() {
+    const v = film.current!;
+    const playable = () => v.readyState >= 3;
+    if (playable()) return;
+    const card = window.setTimeout(() => setLoading('bus'), 400);
+    await loadedFilm().then(live);
+    await new Promise<void>((r) => {
+      if (playable()) return r();
+      const done = () => { v.removeEventListener('canplay', done); v.removeEventListener('error', done); clearTimeout(t); r(); };
+      v.addEventListener('canplay', done);
+      v.addEventListener('error', done);
+      const t = window.setTimeout(done, 20000);
+    }).then(live);
+    clearTimeout(card);
+    setLoading(null);
   }
 
   async function flyButterflyIn() {
@@ -711,6 +761,7 @@ export function BusStop({ flying, entered }: Props) {
   }
 
   async function busArrives() {
+    await filmReady();
     const v = film.current!;
     v.currentTime = 0;
     v.volume = 1;
@@ -947,10 +998,10 @@ export function BusStop({ flying, entered }: Props) {
 
   return (
     <section className="scene stop" aria-label="The bus stop">
-      <video ref={film} className="stop__film" src={filmUrl} playsInline preload="auto" aria-hidden="true" />
+      <video ref={film} className="stop__film" playsInline preload="auto" aria-hidden="true" />
       <div className="layer" aria-hidden="true">
-        <img ref={still} className="layer stop__still" src={emptyUrl} alt="" />
-        <canvas ref={stageCanvas} className="layer" hidden={noStage} />
+        <img ref={still} className="layer stop__still" alt="" />
+        <canvas ref={stageCanvas} className="layer stop__stage" hidden={noStage} />
         <canvas ref={lifeCanvas} className="layer" />
         <canvas ref={buntingCanvas} className="layer" />
       </div>
@@ -1015,6 +1066,20 @@ export function BusStop({ flying, entered }: Props) {
       <canvas ref={fogCanvas} className="layer" hidden={noFog} aria-hidden="true" />
       <div ref={vignette} className="layer stop__vignette" />
       <div ref={flash} className="layer stop__flash" />
+
+      {/* while the pictures (or the bus film) are still arriving */}
+      {loading && (
+        <div className={`stop__loading stop__loading--${loading}`} role="status" aria-live="polite">
+          <svg className="stop__loadfly" viewBox="-30 -24 60 48" aria-hidden="true">
+            <g className="stop__loadwing stop__loadwing--l"><path d="M-2,-2 C-14,-22 -30,-18 -26,-4 C-24,4 -12,6 -2,2Z" /><path d="M-2,2 C-12,6 -22,16 -14,20 C-8,22 -3,12 -1,4Z" /></g>
+            <g className="stop__loadwing stop__loadwing--r"><path d="M2,-2 C14,-22 30,-18 26,-4 C24,4 12,6 2,2Z" /><path d="M2,2 C12,6 22,16 14,20 C8,22 3,12 1,4Z" /></g>
+            <rect x="-1.6" y="-8" width="3.2" height="22" rx="1.6" className="stop__loadbody" />
+          </svg>
+          <p className="stop__loadtext">{loading === 'scene' ? content.loading.scene : content.loading.bus}</p>
+          <div className="stop__loadbar"><i style={{ transform: `scaleX(${Math.max(0.03, loading === 'scene' ? loaded.pictures : loaded.film).toFixed(3)})` }} /></div>
+          <p className="stop__loadslow">{content.loading.slow} · {Math.round((loading === 'scene' ? loaded.pictures : loaded.film) * 100)}%</p>
+        </div>
+      )}
 
       {/* the butterfly speaks */}
       <div ref={bubble} className="stop__bubble" hidden={!ui.bubble} aria-live="polite">

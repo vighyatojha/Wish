@@ -75,6 +75,12 @@ export const content = {
     { animal: 'squirrel', message: 'Stars can’t shine without darkness. So shine.' },
   ],
   noteHint: 'tap the note to close it',
+  // shown in the fog only if page 2's pictures (or the bus film) are still downloading
+  loading: {
+    scene: 'Getting your surprise ready…',
+    bus: 'The bus is on its way…',
+    slow: 'Slow connection, almost there',
+  },
 
   // At the end, all the animals ask her one thing. Her answer is saved.
   question: {
