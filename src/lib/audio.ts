@@ -8,6 +8,24 @@
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+const LEVEL = 0.9;
+
+// ── Mute: one switch for everything (remembered for next time) ──
+let muted = (() => { try { return localStorage.getItem('muted') === '1'; } catch { return false; } })();
+const muteListeners = new Set<(m: boolean) => void>();
+export const isMuted = () => muted;
+export function setMuted(m: boolean): void {
+  muted = m;
+  try { localStorage.setItem('muted', m ? '1' : '0'); } catch { /* private mode */ }
+  if (ctx && master) master.gain.setTargetAtTime(m ? 0 : LEVEL, ctx.currentTime, 0.08);
+  muteListeners.forEach((cb) => cb(m));
+}
+/** called now and on every change (for <audio>/<video> elements, which play outside this engine) */
+export function onMute(cb: (m: boolean) => void): () => void {
+  muteListeners.add(cb);
+  cb(muted);
+  return () => { muteListeners.delete(cb); };
+}
 
 export function unlockAudio(): AudioContext | null {
   const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -15,7 +33,7 @@ export function unlockAudio(): AudioContext | null {
   if (!ctx) {
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = 0.9;
+    master.gain.value = muted ? 0 : LEVEL;
     master.connect(ctx.destination);
   }
   if (ctx.state === 'suspended') void ctx.resume();
@@ -459,4 +477,44 @@ export function createCrickets(): LiveSound {
       window.setTimeout(() => { stopped = true; clearTimeout(timer); out.disconnect(); }, fade * 1000 + 200);
     },
   };
+}
+
+// ── A music box playing "Happy Birthday" (a traditional tune), softly, for the end ──
+export function playMusicBox(beat = 0.43): number {
+  if (!ctx || !master) return 0;
+  const ac = ctx;
+  const out = new GainNode(ac, { gain: 0.5 });
+  // a little room: a soft echo
+  const delay = new DelayNode(ac, { delayTime: 0.31 });
+  const fb = new GainNode(ac, { gain: 0.28 });
+  const wet = new GainNode(ac, { gain: 0.35 });
+  const lp = new BiquadFilterNode(ac, { type: 'lowpass', frequency: 5200 });
+  out.connect(lp).connect(master);
+  out.connect(delay).connect(fb).connect(delay);
+  delay.connect(wet).connect(lp);
+  const N: Record<string, number> = { F2: 87.31, G2: 98, C3: 130.81, F3: 174.61, G3: 196, C4: 261.63, G4: 392, A4: 440, B4: 493.88, C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99 };
+  const tune: [string, number][] = [
+    ['G4', 0.75], ['G4', 0.25], ['A4', 1], ['G4', 1], ['C5', 1], ['B4', 2],
+    ['G4', 0.75], ['G4', 0.25], ['A4', 1], ['G4', 1], ['D5', 1], ['C5', 2],
+    ['G4', 0.75], ['G4', 0.25], ['G5', 1], ['E5', 1], ['C5', 1], ['B4', 1], ['A4', 2],
+    ['F5', 0.75], ['F5', 0.25], ['E5', 1], ['C5', 1], ['D5', 1], ['C5', 3],
+  ];
+  const bass: [string, number][] = [['C3', 1], ['G2', 4], ['G2', 7], ['C3', 10], ['C3', 13], ['F2', 16], ['C3', 20], ['G2', 22], ['C3', 23]]; // (beats into the tune)
+  const t0 = ac.currentTime + 0.1;
+  const pluck = (f: number, t: number, level: number, decay: number) => {
+    for (const [mult, amp] of [[1, 1], [2, 0.28], [3.98, 0.1]] as const) {
+      const o = new OscillatorNode(ac, { type: 'sine', frequency: f * mult });
+      const g = new GainNode(ac, { gain: 0 });
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(level * amp, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + decay / mult ** 0.5);
+      o.connect(g).connect(out);
+      o.start(t);
+      o.stop(t + decay + 0.1);
+    }
+  };
+  let t = t0 + beat;   // (an upbeat's breath first)
+  for (const [n, d] of tune) { pluck(N[n], t, 0.16, 1.6); t += d * beat; }
+  for (const [n, at] of bass) pluck(N[n], t0 + beat * (1 + at), 0.07, 2.4);
+  return t - t0 + 1.5;
 }

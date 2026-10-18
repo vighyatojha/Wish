@@ -13,12 +13,21 @@
 //      and the door folds open with a hiss of air.
 //   6. One by one, five animals step off the bus in stop-motion and
 //      walk up to her with a scroll. It flies up and unrolls; she taps
-//      it closed; the animal dissolves into golden dust. The day
-//      turns to night as they go.
-//   7. Fireflies. Then the animals come back to ask one question.
+//      it closed; the animal dissolves into golden dust.
+//   7. Dusk: the butterflies leave, fireflies rise from the grass.
+//      At night the animals come back to ask one question.
+//   8. The end: the lights glow, a music box plays, fireflies make a
+//      heart, and the birthday message appears.
+//
+//  All along, one clock runs the day from 6 AM to 9 PM (clock.ts),
+//  about 3½ minutes, whatever she's doing: the light, the mist, the
+//  lamp, the bus lights, butterflies, fireflies, birds and sounds all
+//  follow it. The story waits for the clock (the bus comes at 9, each
+//  animal at its hour, the question after dark), never the other way.
 //
 //  While building, ?scene=stop | pluck | bus | animals | question
-//  jumps straight to a step (sound needs a tap first, so it's silent).
+//  jumps straight to a step (sound needs a tap first, so it's silent),
+//  and ?speed=4 runs the clock four times as fast.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { content } from '../content';
@@ -26,8 +35,10 @@ import { gsap, useGSAP, ease } from '../lib/motion';
 import { buzz, prefersReducedMotion } from '../lib/device';
 import {
   createRainSound, createWindSound, createCrickets, playWhoosh, playSnap, playAirRelease, playDoor, playStep,
-  playShimmer, playChime, playPop, type LiveSound,
+  playShimmer, playChime, playPop, playMusicBox, isMuted, setMuted, onMute, type LiveSound,
 } from '../lib/audio';
+import { dayLook, formatHour, DAY_START, DAY_END, SECONDS_PER_HOUR, type DayLook } from '../lib/clock';
+import { norm, type V3 } from '../lib/wings';
 import { saveResponse } from '../lib/firebase';
 import { Fog } from '../lib/fog';
 import { Rain } from '../lib/rain';
@@ -59,8 +70,11 @@ const DOOR_FEET: Vec2 = [DOOR_X, DOOR.y1 - 0.006];
 const STEP_DOWN: Vec2 = [DOOR_X + 0.012, 0.736];
 const EXIT_SIZE = 0.085;   // an animal's height in the doorway, share of the picture height
 const STOP_FPS = 8;        // stop-motion frame rate
-// how dark it gets after each animal: golden hour, sunset, blue hour, dusk, night
-const NIGHTS = [1, 2, 3, 3.65, 4];
+// The hour each animal steps off the bus (if she's still reading, it waits for her).
+const ANIMAL_HOURS = [9.3, 11.6, 13.9, 16.1, 18.0];
+const BUS_HOUR = 9;          // the bus comes at nine
+const QUESTION_HOUR = 20.3;  // the question, after dark
+const SPEED = Math.max(0.25, Number(new URLSearchParams(location.search).get('speed')) || 1);
 
 const CARDS = content.animals;
 const NAME = content.name.toUpperCase();
@@ -79,14 +93,30 @@ const LIGHTS = [
   { tint: [0.56, 0.6, 0.84], sat: 0.72, rim: [180, 196, 255] },  // blue hour
   { tint: [0.5, 0.56, 0.8], sat: 0.6, rim: [205, 222, 255] },    // moonlit night
 ];
-function sceneLight(night: number, rain: number) {
+// early morning: the cool light before sunrise, and the golden sunrise itself
+const DAWN = { tint: [0.66, 0.68, 0.86], sat: 0.8, rim: [200, 205, 255] };
+const SUNRISE = { tint: [1.1, 0.98, 0.84], sat: 1.0, rim: [255, 214, 150] };
+function sceneLight(look: DayLook, rain: number) {
+  const night = look.night;
   const i = Math.min(3, Math.floor(night)), f = Math.min(1, night - i);
   const A = LIGHTS[i], B = LIGHTS[Math.min(4, i + 1)];
   const lerp = (a: number, b: number) => a + (b - a) * f;
   const dim = 1 - rain * 0.22;
-  const tint = A.tint.map((v, k) => lerp(v, B.tint[k]) * dim);
-  const sat = lerp(A.sat, B.sat) * (1 - rain * 0.4);
-  const rim = A.rim.map((v, k) => Math.round(lerp(v, B.rim[k])));
+  let tint = A.tint.map((v, k) => lerp(v, B.tint[k]));
+  let sat = lerp(A.sat, B.sat);
+  let rim = A.rim.map((v, k) => lerp(v, B.rim[k]));
+  // the morning: golden sunrise light, and before it, the cool dawn
+  const sun = look.morning * (1 - look.dawn), dawn = look.dawn;
+  const mixIn = (L: typeof DAWN, w: number) => {
+    tint = tint.map((v, k) => v + (L.tint[k] - v) * w);
+    sat += (L.sat - sat) * w;
+    rim = rim.map((v, k) => v + (L.rim[k] - v) * w);
+  };
+  mixIn(SUNRISE, sun);
+  mixIn(DAWN, dawn);
+  tint = tint.map((v) => v * dim);
+  sat *= 1 - rain * 0.4;
+  rim = rim.map((v) => Math.round(v));
   // saturation matrix, then each row tinted
   const lr = 0.2126, lg = 0.7152, lb = 0.0722;
   const m = [
@@ -95,7 +125,7 @@ function sceneLight(night: number, rain: number) {
     [lr - lr * sat, lg - lg * sat, lb + (1 - lb) * sat],
   ].map((row, r) => row.map((v) => v * tint[r]));
   const values = `${m[0].join(' ')} 0 0 ${m[1].join(' ')} 0 0 ${m[2].join(' ')} 0 0 0 0 0 1 0`;
-  return { values, rim: `rgb(${rim.join(',')})`, shadow: 0.42 - Math.min(1, night / 4) * 0.2 };
+  return { values, rim: `rgb(${rim.join(',')})`, shadow: 0.42 - Math.min(1, night / 4) * 0.2, tint: tint as V3 };
 }
 const skip = new URLSearchParams(location.search).get('scene');
 const showDebug = new URLSearchParams(location.search).has('debug');
@@ -179,7 +209,17 @@ export function BusStop({ flying, entered }: Props) {
   const [loaded, setLoaded] = useState({ pictures: 0, film: 0 });
   const pics = useRef<Pictures | null>(null);
   const [noteIndex, setNoteIndex] = useState(0);
-  const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', bird: false, moon: false, go: false });
+  const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', bird: false, moon: false, go: false, finale: false, replay: false, clock: false });
+  const [muted, setMutedState] = useState(isMuted());
+  const clockText = useRef<HTMLSpanElement>(null);
+  const clockIcon = useRef<SVGGElement>(null);
+  const finaleEl = useRef<HTMLDivElement>(null);
+  // one sound switch for everything (the film and birdsong play outside the sound engine)
+  useEffect(() => onMute((m) => {
+    setMutedState(m);
+    if (film.current) film.current.muted = m;
+    if (sounds.birdsong) sounds.birdsong.muted = m;
+  }), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // GSAP animates these; the frame loop draws from them.
   const S = useRef({
@@ -189,13 +229,16 @@ export function BusStop({ flying, entered }: Props) {
     weights: [1, 0, 0] as [number, number, number],
     tulip: 0, bloom: 0, lift: { x: 0, y: 0, rot: 0, scale: 1 },        // tulip
     bf: { mode: 'off' as 'off' | 'in' | 'perch' | 'away', t: 0, from: [0, 0] as Vec2, to: [0, 0] as Vec2, x: 0, y: 0, tilt: 0 },
-    garden: 0, fore: 0, birds: 0, fireflies: 0, lamp: 0,
+    garden: 0, birds: 0,                                               // (how much the story has let in; the clock does the rest)
+    hour: DAY_START, clock: false,                                     // the day's clock, and whether it's running
+    glow: 0,                                                           // the end: the lights glow a little brighter
     banner: false, row0: 0, row1: 0, row2: 0, away: 0,                // the fairies' bunting
   }).current;
   const actors = useRef<Actor[]>(CARDS.map(() => ({
     mode: 'off', x: 0, y: 0, size: 0, jx: 0, jy: 0, lean: 0, squash: 0, head: 0, footL: 0, footR: 0, offer: 0, clip: false, dust: -1,
   }))).current;
   const sounds = useRef<{ rain?: LiveSound; wind?: LiveSound; crickets?: LiveSound; birdsong?: HTMLAudioElement }>({}).current;
+  const fades = useRef({ birdsong: 0 }).current;
 
   // ── Everything that draws, created once ─────────────────────
   useEffect(() => {
@@ -219,6 +262,7 @@ export function BusStop({ flying, entered }: Props) {
     let bannerHidden = false;
     lifeRef.current = life;
     if (skip) (window as unknown as { __life: Life }).__life = life; // for testing the shortcuts
+    if (showDebug) (window as unknown as { __S: typeof S }).__S = S; // (?debug: tests can set the hour)
     const rain = new Rain(rainCanvas.current!, undefined, prefersReducedMotion() ? 0.5 : 0.9);
     const tulip = new TulipRig(tulipG.current!);
     const bf = new ButterflyRig(bfG.current!);
@@ -310,6 +354,7 @@ export function BusStop({ flying, entered }: Props) {
         `background: ${stage ? (stage.ready ? 'animated (WebGL2)' : 'animated, checking first frame') : stillMode ? `still pictures${brokenReason ? ` — ${brokenReason}` : ''}` : `loading pictures ${Math.round(progress().pictures * 100)}%`}`,
         `self-check pixels: ${st?.probe ?? '—'}  black: ${st?.blackProbes ?? 0}  gl error: ${st?.glError ?? 0}`,
         `fps: ${fps.toFixed(0)}  quality: ${QUALITY[quality]}  size: ${W}×${H} @${window.devicePixelRatio}`,
+        `clock: ${formatHour(S.hour)} (${S.clock ? 'running' : 'waiting'} ×${SPEED})  butterflies ${(S.garden * dayLook(S.hour).butterflies).toFixed(2)} fireflies ${dayLook(S.hour).fireflies.toFixed(2)}`,
         `story: night ${S.night.toFixed(2)} rain ${S.rain.toFixed(2)} haze ${S.haze.toFixed(2)} weights ${S.weights.map((x) => x.toFixed(2)).join('/')}`,
         `film: ready ${v.readyState} t ${v.currentTime.toFixed(1)} frame ${stage?.videoHasFrame ?? false}`,
       ].join('\n');
@@ -317,12 +362,26 @@ export function BusStop({ flying, entered }: Props) {
     let fpsAcc = 0, fpsN = 0;
 
     let last = 0;
+    let lastMinute = -1;
     const frame = (now: number) => {
       const rawDt = last ? (now - last) / 1000 : 0.016;
       const dt = Math.min(0.05, rawDt);
       last = now;
       const time = now / 1000;
       if (rawDt < 1) adapt(rawDt);
+
+      // ── the day's clock (real time: it doesn't wait for anything; paused while the tab is hidden) ──
+      if (S.clock && S.hour < DAY_END) S.hour = Math.min(DAY_END, S.hour + (Math.min(rawDt, 0.25) * SPEED) / SECONDS_PER_HOUR);
+      const look = dayLook(S.hour);
+      S.night = look.night;
+      const minute = Math.floor(S.hour * 12);
+      if (minute !== lastMinute && clockText.current) {
+        lastMinute = minute;
+        clockText.current.textContent = formatHour(minute / 12);
+        // the little clock face's hand
+        clockIcon.current?.setAttribute('transform', `rotate(${((S.hour % 12) / 12) * 360} 12 12)`);
+        clockIcon.current?.parentElement?.querySelector('.stop__clock-min')?.setAttribute('transform', `rotate(${(S.hour % 1) * 360 - 90} 12 12)`);
+      }
       if (debugPanel) { fpsAcc += rawDt; fpsN++; if (++debugTick % 20 === 0) { writeDebug(fpsN / Math.max(0.001, fpsAcc)); fpsAcc = 0; fpsN = 0; } }
 
       // ── camera ──
@@ -393,7 +452,7 @@ export function BusStop({ flying, entered }: Props) {
       }
 
       // ── light the characters like the scene around them ──
-      const light = sceneLight(S.night, S.rain);
+      const light = sceneLight(look, S.rain);
       if (lightMatrix.current && lightMatrix.current.getAttribute('values') !== light.values) {
         lightMatrix.current.setAttribute('values', light.values);
         svg.current!.style.setProperty('--rim', light.rim);
@@ -446,7 +505,8 @@ export function BusStop({ flying, entered }: Props) {
       if (stage) {
         stage.render({
           time, layout, zoom: z, zoomCenter: center, blur: S.blur, focus,
-          weights: S.weights, rain: S.rain, night: S.night, door: S.door, wind: S.wind, cloud: S.cloud, lamp: S.lamp,
+          weights: S.weights, rain: S.rain, night: look.night, door: S.door, wind: S.wind, cloud: S.cloud,
+          lamp: look.lamp * (1 + S.glow * 0.35), morn: look.morning, dawn: look.dawn, mist: look.mist, noon: look.noon,
         });
         // shown only once a frame has been checked and is a real picture
         if (stage.ready && !stageShown) {
@@ -460,21 +520,26 @@ export function BusStop({ flying, entered }: Props) {
         const fv = film.current!;
         fv.classList.add('is-shown');
         fv.style.opacity = S.weights[1].toFixed(3);
-        const src = S.weights[2] > 0.5 ? pics.current.bus : pics.current.empty;
+        const src = S.weights[2] > 0.5 ? pics.current.bus : look.morning > 0.5 ? pics.current.morning : pics.current.empty;
         if (s.src !== src) s.src = src;
         const tx = (0.5 + ((base.offset[0] - layout.offset[0]) / base.span[0] - 0.5) * z) * W;
         const ty = (0.5 + ((base.offset[1] - layout.offset[1]) / base.span[1] - 0.5) * z) * H;
         s.style.transformOrigin = '0 0';
         s.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${z.toFixed(4)})`;
-        s.style.filter = `brightness(${(1 - S.rain * 0.3 - S.night * 0.17).toFixed(2)}) saturate(${(1 - S.rain * 0.4).toFixed(2)}) blur(${(S.blur * 2).toFixed(1)}px)`;
+        s.style.filter = `brightness(${(1 - S.rain * 0.3 - S.night * 0.17 - look.dawn * 0.3).toFixed(2)}) saturate(${(1 - S.rain * 0.4).toFixed(2)}) blur(${(S.blur * 2).toFixed(1)}px)`;
       }
 
       // ── life, rain, fog ──
-      life.amount.garden = S.garden;
-      life.amount.fore = S.fore;
-      life.amount.birds = S.birds;
-      life.amount.fireflies = S.fireflies;
+      life.amount.garden = S.garden * look.butterflies;
+      life.amount.birds = S.birds * look.birds;
+      life.amount.fireflies = look.fireflies;
+      life.light = { tint: light.tint, sun: norm(look.sun), sunlight: look.sunlight * (1 - S.rain) };
+      { const half = base.span[0] / (2 * z), mid = layout.offset[0] + base.span[0] / 2; life.view = [mid - half, mid + half]; }
       life.frame(time, dt, map, ppp);
+
+      // ── sounds of the hour: birds in the morning, crickets in the evening ──
+      if (sounds.birdsong) sounds.birdsong.volume = clamp(look.birdsong * 0.55 * fades.birdsong);
+      if (S.clock && look.crickets > 0.01) (sounds.crickets ??= createCrickets()).setLevel(look.crickets);
       if (banner && S.banner) {
         if (S.away < 1) { banner.update(time, dt, [S.row0, S.row1, S.row2], S.away); bannerHidden = false; }
         else if (!bannerHidden) { banner.hideAll(); bannerHidden = true; S.banner = false; }
@@ -494,10 +559,11 @@ export function BusStop({ flying, entered }: Props) {
 
     // tapping a bird (there is no hint that she can)
     const onSky = (e: PointerEvent) => {
+      if ((e.target as Element | null)?.closest?.('.stop__hud')) return;
       const { map, ppp, W: w, H: h } = mapRef.current;
       const [mx, my] = map(MOON);
       const onMoon = S.night > 3.2 && Math.hypot(mx * w - e.clientX, my * h - e.clientY) < Math.max(34, MOON_R * ppp * 1.3);
-      const onBird = S.birds > 0.2 && life.hitBird(e.clientX, e.clientY);
+      const onBird = S.birds * dayLook(S.hour).birds > 0.2 && life.hitBird(e.clientX, e.clientY);
       if (!onMoon && !onBird) return;
       e.stopPropagation();
       e.preventDefault();
@@ -570,14 +636,20 @@ export function BusStop({ flying, entered }: Props) {
   const tapPluck = () => new Promise<void>((r) => { waiters.current.pluck = r; }).then(live);
   const tapNote = () => new Promise<void>((r) => { waiters.current.note = r; }).then(live);
   const chosen = () => new Promise<string>((r) => { waiters.current.answer = r; }).then(live);
+  /** waits until the day's clock reaches this hour */
+  const until = async (hour: number) => { while (S.hour < hour) await wait(0.2); };
 
   async function story() {
     const reduced = prefersReducedMotion();
     if (skip === 'pluck' || skip === 'bus' || skip === 'animals' || skip === 'question') {
       Object.assign(S, { haze: 0, travel: 8.2, light: 1, fogGone: true, rain: 0, rainFall: 0, wind: 0.35, cloud: 1, tulip: 1, bloom: 1 });
     }
-    if (skip === 'bus' || skip === 'animals' || skip === 'question') Object.assign(S, { tulip: 0, garden: 1, fore: 1, birds: 1 });
+    if (skip === 'bus' || skip === 'animals' || skip === 'question') Object.assign(S, { tulip: 0, garden: 1, birds: 1 });
     if (skip === 'animals' || skip === 'question') { S.weights = [0, 0, 1]; S.door = 1; }
+    // the day begins (when jumping straight to a step, at that step's hour)
+    S.hour = ({ pluck: 7.2, bus: BUS_HOUR - 0.15, animals: ANIMAL_HOURS[0], question: QUESTION_HOUR } as Record<string, number>)[skip ?? ''] ?? DAY_START;
+    S.clock = true;
+    setUi((u) => ({ ...u, clock: true }));
 
     if (!skip || skip === 'stop' || skip === 'pluck') {
       if (!skip || skip === 'stop') {
@@ -605,12 +677,14 @@ export function BusStop({ flying, entered }: Props) {
       await tapPluck();
       await pluck();
       // ── the garden, and the fairies with the bunting ──
-      gsap.to(S, { garden: 1, fore: 1, birds: 1, duration: 2, ease: ease.enter });
+      gsap.to(S, { garden: 1, birds: 1, duration: 2, ease: ease.enter });
       await wait(1.2);
       await bunting();
     }
 
     if (skip !== 'animals' && skip !== 'question') {
+      // the bus comes at nine
+      await until(BUS_HOUR);
       await busArrives();
       await wait(0.6);
       playDoor();
@@ -619,15 +693,16 @@ export function BusStop({ flying, entered }: Props) {
     }
 
     if (skip !== 'question') {
-      for (let i = 0; i < CARDS.length; i++) await visit(i);
-      gsap.to(S, { fireflies: 1, duration: 3.5, ease: 'sine.inOut' });
-      await wait(2.5);
-    } else {
-      Object.assign(S, { night: 4, garden: 0, fore: 0, birds: 0, fireflies: 1, lamp: 1 });
-      sounds.crickets ??= createCrickets();
-      sounds.crickets.setLevel(1);
+      // the animals come through the day, each at its hour
+      for (let i = 0; i < CARDS.length; i++) {
+        await until(ANIMAL_HOURS[i]);
+        await visit(i);
+      }
     }
+    await until(QUESTION_HOUR);
+    await wait(1);
     await question();
+    await finale();
   }
 
   function startBirdsong() {
@@ -637,7 +712,9 @@ export function BusStop({ flying, entered }: Props) {
       const a = (sounds.birdsong = new Audio(src));
       a.loop = true;
       a.volume = 0;
-      a.play().then(() => gsap.to(a, { volume: 0.55, duration: 4, ease: ease.scenery })).catch(() => {});
+      a.muted = isMuted();
+      // (its volume follows the hour, in the frame loop; this just fades it in)
+      a.play().then(() => gsap.to(fades, { birdsong: 1, duration: 4, ease: ease.scenery })).catch(() => {});
     });
   }
 
@@ -873,32 +950,12 @@ export function BusStop({ flying, entered }: Props) {
     await note.current!.close().then(live);
     gsap.to(a, { offer: 0, head: 0, duration: 0.4, ease: 'sine.inOut' });
 
-    // …and dissolves into golden dust; the day moves on
-    gsap.to(S, { night: NIGHTS[i], duration: 5, ease: 'sine.inOut' });
-    if (i === 1) {
-      gsap.to(S, { birds: 0.5, duration: 4 });
-      // the street lamp flickers on as the sun goes down
-      gsap.timeline({ delay: 3.6 })
-        .to(S, { lamp: 0.6, duration: 0.08 }).to(S, { lamp: 0.1, duration: 0.1 })
-        .to(S, { lamp: 0.8, duration: 0.08 }).to(S, { lamp: 0.3, duration: 0.12 })
-        .to(S, { lamp: 1, duration: 0.6, ease: 'sine.out' });
-    }
-    if (i === 2) { gsap.to(S, { garden: 0, duration: 4 }); fadeBirdsong(); }
-    if (i === 3) {
-      gsap.to(S, { birds: 0, fore: 0, duration: 4 });
-      const c = (sounds.crickets ??= createCrickets());
-      const lvl = { v: 0 };
-      gsap.to(lvl, { v: 1, duration: 5, onUpdate: () => c.setLevel(lvl.v) });
-    }
+    // …and dissolves into golden dust (the day goes on by itself, on the clock)
     await dissolve(i);
   }
 
   const reduced = () => prefersReducedMotion();
 
-  function fadeBirdsong() {
-    const b = sounds.birdsong;
-    if (b) gsap.to(b, { volume: 0, duration: 5, ease: 'sine.in', onComplete: () => b.pause() });
-  }
 
   async function dissolve(i: number) {
     const a = actors[i];
@@ -986,6 +1043,29 @@ export function BusStop({ flying, entered }: Props) {
         .to(a, { squash: -0.08, y: a.y - a.size * 0.18, duration: 0.2, ease: 'power2.out' })
         .to(a, { squash: 0, y: a.y, duration: 0.25, ease: 'power2.in' });
     });
+  }
+
+  // ── the end: the scene settles, the lights glow, a music box, a heart of fireflies, and her message ──
+  async function finale() {
+    await wait(2.4);
+    const q = document.querySelector('.stop__question');
+    if (q) await play(gsap.to(q, { autoAlpha: 0, y: -12, duration: 0.7, ease: ease.exit }));
+    setUi((u) => ({ ...u, question: false }));
+    // everything settles: the camera eases in a touch, the lamp and the bus glow warmer
+    gsap.to(S, { z: 1.05, duration: 8, ease: 'sine.inOut' });
+    gsap.to(S, { glow: 1, vignette: 0.5, duration: 3.5, ease: 'sine.inOut' });
+    const tune = playMusicBox();
+    await wait(1.2);
+    // fireflies gather into a heart around the full moon
+    const { map, ppp, W, H } = mapRef.current;
+    const [mx, my] = map(MOON);
+    const r = Math.max(46, MOON_R * ppp * 2.1);
+    lifeRef.current!.heart(mx * W, my * H + r * 0.12, r, 14);
+    // the message appears just below the moon
+    finaleEl.current?.style.setProperty('--top', `${Math.min(H * 0.42, my * H + r * 1.25)}px`);
+    setUi((u) => ({ ...u, finale: true }));
+    await wait(Math.max(16, tune + 2));
+    setUi((u) => ({ ...u, replay: true }));
   }
 
   const flowers = useMemo(() => ({
@@ -1131,6 +1211,38 @@ export function BusStop({ flying, entered }: Props) {
             ))}
           </div>
           {ui.answer && <p className="stop__thanks">{content.question.thanks}</p>}
+        </div>
+      )}
+      {/* the end */}
+      <div ref={finaleEl} className={`stop__finale${ui.finale ? ' is-on' : ''}`} aria-live="polite" hidden={!ui.finale}>
+        <h2 className="stop__finale-title">
+          <span className="stop__finale-hb">{content.finale.title}</span>
+          <span className="stop__finale-name">{content.name}</span>
+        </h2>
+        <p className="stop__finale-msg">{content.finale.message}</p>
+        {ui.replay && (
+          <button type="button" className="stop__replay" onClick={() => location.assign(location.pathname)}>{content.finale.replay}</button>
+        )}
+      </div>
+
+      {/* the time of day, and the sound switch */}
+      {ui.clock && (
+        <div className="stop__hud">
+          <p className="stop__clock" aria-label="Time of day at the bus stop">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="9.2" />
+              <g ref={clockIcon}><line x1="12" y1="12" x2="12" y2="6" /></g>
+              <line className="stop__clock-min" x1="12" y1="12" x2="16.5" y2="12" />
+            </svg>
+            <span ref={clockText}>6:00 AM</span>
+          </p>
+          <button type="button" className="stop__sound" aria-pressed={!muted} aria-label={muted ? content.sound.unmute : content.sound.mute}
+            title={muted ? content.sound.unmute : content.sound.mute} onClick={() => setMuted(!muted)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path className="stop__sound-body" d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z" />
+              {muted ? <path d="M15.5 9.5l5 5M20.5 9.5l-5 5" /> : <path d="M15.6 9a4.2 4.2 0 0 1 0 6M18 6.6a7.6 7.6 0 0 1 0 10.8" />}
+            </svg>
+          </button>
         </div>
       )}
       {showDebug && <pre ref={debug} className="stop__debug" />}

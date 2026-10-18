@@ -250,3 +250,110 @@
 @media (prefers-reduced-motion: reduce) {
   .stop__loadwing, .stop__loadfly { animation: none; }
 }
+
+/* ── the corner plates: the time of day, and the sound switch ── */
+.stop__hud {
+  position: absolute;
+  inset: calc(10px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) auto calc(10px + env(safe-area-inset-left));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+  animation: stop-hud-in 1.2s 0.4s ease both;
+}
+@keyframes stop-hud-in { from { opacity: 0; } }
+.stop__clock, .stop__sound {
+  pointer-events: auto;
+  color: #fbf3e1;
+  background: rgba(16, 20, 30, 0.34);
+  border: 1px solid rgba(251, 243, 225, 0.22);
+  box-shadow: 0 2px 10px rgba(10, 12, 20, 0.18);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.stop__clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.3rem 0.75rem 0.3rem 0.45rem;
+  border-radius: 999px;
+  font: 500 1rem / 1 'EB Garamond', Georgia, serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+.stop__clock svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-linecap: round; }
+.stop__clock circle { stroke-width: 1.4; opacity: 0.8; }
+.stop__clock line { stroke-width: 1.9; }
+.stop__clock .stop__clock-min { stroke-width: 1.3; opacity: 0.8; }
+.stop__sound {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.stop__sound svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.stop__sound .stop__sound-body { fill: currentColor; stroke: none; }
+.stop__sound:active { transform: scale(0.94); }
+.stop__sound:focus-visible { outline: 2px solid #ffd98a; outline-offset: 3px; }
+
+/* ── the end: below the moon, in the lamp's gold ── */
+.stop__finale {
+  position: absolute;
+  left: 50%;
+  top: var(--top, 22svh);
+  width: min(88vw, 34rem);
+  transform: translateX(-50%);
+  text-align: center;
+  color: #fff3d6;
+  pointer-events: none;
+}
+.stop__finale-title { margin: 0; font-weight: 400; line-height: 1; }
+.stop__finale-hb, .stop__finale-name { display: block; font-family: 'Dancing Script', cursive; font-weight: 600; }
+.stop__finale-hb {
+  font-size: clamp(2.6rem, 1.6rem + 5vw, 4.6rem);
+  color: #ffe2a0;
+  text-shadow: 0 0 18px rgba(255, 196, 92, 0.65), 0 0 46px rgba(255, 170, 60, 0.35), 0 2px 3px rgba(40, 20, 0, 0.5);
+}
+.stop__finale-name {
+  margin-top: 0.1em;
+  font-size: clamp(3.2rem, 2rem + 6.5vw, 6rem);
+  color: #fff6de;
+  text-shadow: 0 0 22px rgba(255, 214, 130, 0.7), 0 0 60px rgba(255, 186, 80, 0.4), 0 2px 3px rgba(40, 20, 0, 0.5);
+}
+.stop__finale-msg {
+  max-width: 30ch;
+  margin: 1.1rem auto 0;
+  font: italic 400 clamp(1.1rem, 1rem + 0.5vw, 1.3rem) / 1.5 'EB Garamond', Georgia, serif;
+  color: #f4ead6;
+  text-shadow: 0 1px 8px rgba(8, 10, 30, 0.9), 0 0 2px rgba(8, 10, 30, 0.8);
+  text-wrap: pretty;
+}
+/* one reveal: the words come out of the dark like the lamp warming up */
+.stop__finale.is-on .stop__finale-hb { animation: stop-glow-in 2.4s 0.2s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.stop__finale.is-on .stop__finale-name { animation: stop-glow-in 2.8s 1.3s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.stop__finale.is-on .stop__finale-msg { animation: stop-msg-in 2s 3.4s ease both; }
+@keyframes stop-glow-in {
+  from { opacity: 0; filter: blur(10px); transform: scale(0.96); letter-spacing: 0.06em; }
+  to { opacity: 1; filter: blur(0); transform: none; letter-spacing: 0; }
+}
+@keyframes stop-msg-in { from { opacity: 0; transform: translateY(6px); } }
+.stop__replay {
+  pointer-events: auto;
+  margin-top: 1.4rem;
+  padding: 0.45rem 1.1rem 0.5rem;
+  font: 400 1.1rem / 1 'Patrick Hand', 'Comic Sans MS', cursive;
+  color: #fff3d6;
+  background: rgba(16, 20, 40, 0.4);
+  border: 1px solid rgba(255, 226, 160, 0.45);
+  border-radius: 999px;
+  animation: stop-msg-in 1.2s ease both;
+}
+.stop__replay:focus-visible { outline: 2px solid #ffd98a; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .stop__finale.is-on .stop__finale-hb, .stop__finale.is-on .stop__finale-name, .stop__finale.is-on .stop__finale-msg { animation-duration: 0.6s; filter: none; }
+}

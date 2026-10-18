@@ -64,8 +64,8 @@ export const content = {
     close: 'tap anywhere to close',
   },
 
-  // One animal at a time steps off the bus with a scroll for her.
-  // The day turns to night as they go. These are placeholders:
+  // One animal at a time steps off the bus with a scroll for her,
+  // spread across the day (the clock runs 6 AM → 9 PM in about 3½ minutes). These are placeholders:
   // replace them with your own words (a sentence or two each).
   animals: [
     { animal: 'bunny', message: 'Bloom where you are planted, and keep growing towards the light.' },
@@ -89,4 +89,15 @@ export const content = {
     options: ['Tulip', 'Lily', 'Lotus'],
     thanks: 'Noted! Hold on, there’s more…',
   },
+
+  // The very end, at night: the lights glow, a music box plays, and this appears.
+  // A placeholder message: replace it with your own words.
+  finale: {
+    title: 'Happy Birthday',
+    message: 'From the first light of the morning to the last firefly of the night, this whole day was for you. May your year be just as bright.',
+    replay: 'Watch it again',
+  },
+
+  // The small round button in the corner
+  sound: { mute: 'Turn sound off', unmute: 'Turn sound on' },
 } as const;

@@ -1,9 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 //  Everything small that moves over the bus stop, on one canvas:
 //  • a swarm of butterflies that sweeps across the whole screen;
-//  • a few butterflies fluttering about the garden;
+//  • butterflies living in the meadow, in 3D (meadow.ts);
 //  • white and black birds crossing the sky (she can tap them);
-//  • fireflies wandering in the dark;
+//  • fireflies rising out of the grass at dusk, wandering in the dark
+//    (and once, at the very end, gathering into a heart);
 //  • tulip petals bursting outwards;
 //  • golden dust an animal dissolves into.
 //  Garden things are pinned to the picture (they move with the
@@ -15,99 +16,9 @@ const TAU = Math.PI * 2;
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 
-// ── Butterfly wings, painted once per colour ────────────────────
-interface WingSet { right: HTMLCanvasElement; left: HTMLCanvasElement; body: HTMLCanvasElement }
-export interface WingColors { inner: string; outer: string; edge: string; dots: string }
-export const WING_COLORS: WingColors[] = [
-  { inner: '#a8e4ff', outer: '#2f77d8', edge: '#16244a', dots: '#ffffff' }, // sky blue
-  { inner: '#ffd27a', outer: '#ee6a1c', edge: '#2a160c', dots: '#fff4dc' }, // monarch
-  { inner: '#fff6b0', outer: '#f2c230', edge: '#3a2a10', dots: '#ffffff' }, // lemon
-  { inner: '#ffe0f0', outer: '#ff78b2', edge: '#5a1f3a', dots: '#ffffff' }, // rose
-  { inner: '#efe2ff', outer: '#9a78e6', edge: '#2e1f4a', dots: '#ffffff' }, // lilac
-  { inner: '#dcfff2', outer: '#3fc79a', edge: '#123a2c', dots: '#ffffff' }, // mint
-];
-const SPRITE = 64; // wing sprite size (px) at 1×; drawn scaled
-
-function paintWing(c: WingColors, mirror: boolean): HTMLCanvasElement {
-  const cv = document.createElement('canvas');
-  cv.width = SPRITE * 2;
-  cv.height = SPRITE * 2;
-  const g = cv.getContext('2d')!;
-  g.scale(2, 2);
-  // body axis at x = 0 (left edge for the right wing), middle height
-  if (mirror) { g.translate(SPRITE, 0); g.scale(-1, 1); }
-  g.translate(2, SPRITE / 2);
-  const fore = new Path2D('M0,-3 C10,-26 34,-34 56,-28 C60,-16 52,-6 36,-2 C24,0 10,1 0,1Z');
-  const hind = new Path2D('M0,2 C14,2 32,6 40,16 C42,26 30,32 18,30 C10,26 4,16 0,4Z');
-  for (const p of [hind, fore]) {
-    const grd = g.createRadialGradient(4, 0, 2, 10, 0, 56);
-    grd.addColorStop(0, c.inner);
-    grd.addColorStop(0.75, c.outer);
-    grd.addColorStop(1, c.edge);
-    g.fillStyle = grd;
-    g.fill(p);
-    g.lineWidth = 1.6;
-    g.strokeStyle = c.edge;
-    g.stroke(p);
-  }
-  // dark border band and white dots along it
-  g.save();
-  g.clip(fore);
-  g.lineWidth = 6;
-  g.strokeStyle = c.edge;
-  g.globalAlpha = 0.85;
-  g.stroke(new Path2D('M10,-24 C30,-34 52,-32 58,-26 C58,-14 50,-6 36,-1'));
-  g.restore();
-  g.fillStyle = c.dots;
-  for (const [x, y, r] of [[46, -26, 1.6], [52, -20, 1.4], [50, -12, 1.3], [30, 26, 1.4], [37, 20, 1.3]] as const) {
-    g.beginPath();
-    g.arc(x, y, r, 0, TAU);
-    g.fill();
-  }
-  // veins
-  g.globalAlpha = 0.35;
-  g.strokeStyle = c.edge;
-  g.lineWidth = 0.8;
-  g.stroke(new Path2D('M2,-1 C16,-12 30,-20 50,-24 M2,0 C18,-4 30,-6 44,-8 M2,3 C14,8 24,14 32,24'));
-  return cv;
-}
-
-function paintBody(): HTMLCanvasElement {
-  const cv = document.createElement('canvas');
-  cv.width = 24;
-  cv.height = 80;
-  const g = cv.getContext('2d')!;
-  g.scale(2, 2);
-  g.translate(6, 20);
-  g.fillStyle = '#2a1d16';
-  g.beginPath(); g.ellipse(0, 4, 2.6, 13, 0, 0, TAU); g.fill();
-  g.beginPath(); g.arc(0, -10, 3.2, 0, TAU); g.fill();
-  g.strokeStyle = '#2a1d16';
-  g.lineWidth = 0.9;
-  g.beginPath(); g.moveTo(-1, -12); g.quadraticCurveTo(-4, -18, -5, -19); g.moveTo(1, -12); g.quadraticCurveTo(4, -18, 5, -19); g.stroke();
-  return cv;
-}
-
-const wingCache: WingSet[] = [];
-function wings(i: number): WingSet {
-  return (wingCache[i] ??= { right: paintWing(WING_COLORS[i], false), left: paintWing(WING_COLORS[i], true), body: paintBody() });
-}
-
-/** Draw one butterfly. size = wingspan in px; heading 0 = flying up the screen. */
-function drawButterfly(g: CanvasRenderingContext2D, x: number, y: number, size: number, heading: number, phase: number, colour: number, alpha = 1) {
-  const w = wings(colour);
-  const k = size / 112;               // wingspan of the sprite ≈ 112 units
-  const open = 0.18 + 0.82 * Math.abs(Math.cos(phase));
-  g.save();
-  g.globalAlpha = alpha;
-  g.translate(x, y);
-  g.rotate(heading);
-  g.scale(k, k);
-  g.save(); g.scale(open, 1); g.drawImage(w.right, -2, -SPRITE / 2, SPRITE, SPRITE); g.restore();
-  g.save(); g.scale(open, 1); g.drawImage(w.left, -SPRITE + 2, -SPRITE / 2, SPRITE, SPRITE); g.restore();
-  g.drawImage(w.body, -6, -20, 12, 40);
-  g.restore();
-}
+import { drawButterfly3D, norm, NEUTRAL, WING_COLORS, type Light, type V3 } from './wings';
+import { Meadow } from './meadow';
+export { WING_COLORS };
 
 // ── Petals, painted once: tulip pink, front and back, sharp and soft ──
 interface PetalSprites { front: HTMLCanvasElement; back: HTMLCanvasElement; soft: HTMLCanvasElement }
@@ -153,11 +64,10 @@ function petalSprites(i: number): PetalSprites {
 }
 
 // ── Kinds of life ─────────────────────────────────────────────
-interface Flyer { x: number; y: number; vx: number; vy: number; size: number; phase: number; speed: number; colour: number; seed: number }
-interface Garden { home: Vec2; phase: number; colour: number; seed: number; size: number }
-interface Fore { seed: number; phase: number; colour: number; size: number }
+interface Flyer { x: number; y: number; vx: number; vy: number; vz: number; size: number; phase: number; speed: number; colour: number; seed: number }
 interface Bird { x: number; y: number; vx: number; size: number; phase: number; white: boolean; bob: number; sx: number; sy: number }
-interface Firefly { home: Vec2; seed: number; size: number; depth: number }
+interface Firefly { home: Vec2; seed: number; size: number; depth: number; th: number }
+interface HeartSpark { from: [number, number]; to: [number, number]; seed: number; delay: number }
 interface Petal { x: number; y: number; vx: number; vy: number; rot: number; spin: number; flip: number; flipRate: number; size: number; age: number; life: number; tint: number; near: boolean; seed: number }
 interface Mote { x: number; y: number; vx: number; vy: number; r: number; g: number; b: number; delay: number; age: number; life: number; size: number; seed: number }
 
@@ -169,8 +79,10 @@ export class Life {
   private dpr = 1;
   private swarmers: Flyer[] = [];
   private swarmDone: (() => void) | null = null;
-  private garden: Garden[];
-  private fore: Fore[];
+  private meadow: Meadow;
+  private heartSparks: HeartSpark[] = [];
+  private heartT = -1;
+  private heartLen = 0;
   private birds: Bird[] = [];
   private birdTimer = 1;
   private fireflies: Firefly[];
@@ -182,23 +94,25 @@ export class Life {
   private bokehDisc: HTMLCanvasElement;
 
   /** 0 → 1: how much of each is showing */
-  amount = { garden: 0, fore: 0, birds: 0, fireflies: 0 };
+  amount = { garden: 0, birds: 0, fireflies: 0 };
   maxDpr = 1.75;
+  /** the light of the hour (the butterflies are lit by it) */
+  light: Light = NEUTRAL;
+  /** the part of the picture on screen (u range) */
+  set view(v: [number, number]) { this.meadow.view = v; }
 
   /** back: behind the characters · front: in front of them */
   constructor(private canvas: HTMLCanvasElement, private front: HTMLCanvasElement) {
     this.g = canvas.getContext('2d')!;
     this.f = front.getContext('2d')!;
-    this.garden = [[0.4, 0.6], [0.6, 0.62], [0.47, 0.66], [0.7, 0.64], [0.33, 0.68], [0.55, 0.58], [0.64, 0.7]].map((home, i) => ({
-      home: home as Vec2, phase: rand(0, TAU), colour: i % WING_COLORS.length, seed: rand(0, 100), size: rand(0.03, 0.042),
-    }));
-    this.fore = Array.from({ length: 3 }, (_, i) => ({ seed: rand(0, 100) + i * 37, phase: rand(0, TAU), colour: (i * 2 + 1) % WING_COLORS.length, size: rand(0.07, 0.1) }));
+    const few = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || (navigator.hardwareConcurrency ?? 8) <= 4;
+    this.meadow = new Meadow(few ? 6 : 10);
     // fireflies at three depths: far specks over the fields, nearer ones, and big soft out-of-focus lights
     this.fireflies = Array.from({ length: 70 }, () => {
       const depth = Math.random();
-      return { home: [rand(0.0, 1.0), 0.58 + depth * 0.38 + rand(-0.04, 0.04)] as Vec2, seed: rand(0, 100), size: 0.5 + depth * 1.1, depth };
+      return { home: [rand(0.0, 1.0), 0.58 + depth * 0.38 + rand(-0.04, 0.04)] as Vec2, seed: rand(0, 100), size: 0.5 + depth * 1.1, depth, th: Math.random() * 0.7 };
     });
-    this.bokeh = Array.from({ length: 9 }, () => ({ home: [rand(0.05, 0.95), rand(0.15, 0.95)] as Vec2, seed: rand(0, 100), size: rand(0.6, 1.4), depth: 1 }));
+    this.bokeh = Array.from({ length: 5 }, () => ({ home: [rand(0.05, 0.95), rand(0.15, 0.95)] as Vec2, seed: rand(0, 100), size: rand(0.6, 1.4), depth: 1, th: rand(0.4, 0.9) }));
     this.glow = this.makeGlow(24, 'rgba(255,214,110,1)', 'rgba(255,170,40,0)');
     this.fireGlow = this.makeGlow(48, 'rgba(240,255,170,1)', 'rgba(170,255,90,0)');
     this.bokehDisc = this.makeBokeh(96);
@@ -260,7 +174,7 @@ export class Life {
       const speed = (0.28 + near * 0.35) * diag;
       const ang = fromLeft ? rand(-0.55, -0.1) : rand(-1.7, -1.1);
       this.swarmers.push({
-        x: x - (i / count) * W * 0.6, y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
+        x: x - (i / count) * W * 0.6, y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed, vz: rand(-0.5, 0.5) * speed,
         size, phase: rand(0, TAU), speed, colour: i % WING_COLORS.length, seed: rand(0, 100),
       });
     }
@@ -296,6 +210,25 @@ export class Life {
     }
   }
 
+  /**
+   * A rare little surprise: fireflies drift together into a heart around (cx, cy),
+   * glow there for a while, then wander off again.
+   */
+  heart(cx: number, cy: number, size: number, seconds = 9) {
+    const n = 34;
+    this.heartSparks = Array.from({ length: n }, (_, i) => {
+      const t = (i / n) * TAU;
+      const hx = 16 * Math.sin(t) ** 3, hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+      return {
+        from: [rand(0, this.W), rand(this.H * 0.55, this.H)] as [number, number],
+        to: [cx + (hx / 17) * size, cy + (hy / 17) * size] as [number, number],
+        seed: rand(0, 100), delay: rand(0, 0.8),
+      };
+    });
+    this.heartT = 0;
+    this.heartLen = seconds;
+  }
+
   /** Where the birds are on screen (for testing). */
   get birdSpots(): [number, number][] { return this.birds.filter((b) => b.sx > 20 && b.sx < this.W - 20).map((b) => [b.sx, b.sy]); }
 
@@ -315,13 +248,17 @@ export class Life {
     if (this.amount.fireflies > 0.01) {
       g.globalCompositeOperation = 'lighter';
       for (const ff of this.fireflies) {
+        // each one wakes at its own moment and rises out of the grass
+        const awake = clamp((this.amount.fireflies - ff.th) / 0.3);
+        if (awake <= 0) continue;
+        const rise = (1 - awake) ** 2 * 0.06;
         const t = time * (0.06 + ff.depth * 0.08) + ff.seed;
-        const u: Vec2 = [ff.home[0] + Math.sin(t * 1.3) * 0.035 + Math.sin(t * 2.9 + 1) * 0.012, ff.home[1] + Math.cos(t * 1.1) * 0.022 + Math.sin(t * 3.7) * 0.008];
+        const u: Vec2 = [ff.home[0] + Math.sin(t * 1.3) * 0.035 + Math.sin(t * 2.9 + 1) * 0.012, ff.home[1] + rise + Math.cos(t * 1.1) * 0.022 + Math.sin(t * 3.7) * 0.008];
         const [sx, sy] = map(u);
         // each one glows for a few seconds, then rests in the dark
         const cycle = (time * (0.18 + (ff.seed % 1) * 0.12) + ff.seed) % 1;
         const on = Math.sin(Math.PI * clamp(cycle / 0.55)) ** 2;
-        const a = this.amount.fireflies * (0.05 + 0.95 * on);
+        const a = awake * (0.05 + 0.95 * on);
         const s = (4 + pxPerPicture * 0.02) * ff.size;
         g.globalAlpha = a * (0.55 + ff.depth * 0.45);
         g.drawImage(this.fireGlow, sx * W - s, sy * H - s, s * 2, s * 2);
@@ -340,8 +277,8 @@ export class Life {
         const y = (b.home[1] + Math.cos(t * 0.9) * 0.06) * H;
         const cycle = (time * 0.09 + b.seed) % 1;
         const on = Math.sin(Math.PI * clamp(cycle / 0.6)) ** 2;
-        const r = Math.min(W, H) * 0.05 * b.size;
-        f.globalAlpha = this.amount.fireflies * on * 0.55;
+        const r = Math.min(W, H) * 0.04 * b.size;
+        f.globalAlpha = clamp((this.amount.fireflies - b.th) / 0.2) * on * 0.32;
         f.drawImage(this.bokehDisc, x - r, y - r, r * 2, r * 2);
       }
       f.globalCompositeOperation = 'source-over';
@@ -374,30 +311,8 @@ export class Life {
     }
     this.birds = this.birds.filter((b) => b.x > -0.2 && b.x < 1.2);
 
-    // ── garden butterflies about the stop ──
-    if (this.amount.garden > 0.01) {
-      for (const gb of this.garden) {
-        const t = time * 0.35 + gb.seed;
-        const u: Vec2 = [gb.home[0] + Math.sin(t) * 0.05 + Math.sin(t * 2.3) * 0.015, gb.home[1] + Math.sin(t * 1.7 + 1) * 0.03 - Math.abs(Math.sin(t * 4.1)) * 0.012];
-        const du: Vec2 = [Math.cos(t) * 0.05 + Math.cos(t * 2.3) * 0.034, Math.cos(t * 1.7 + 1) * 0.05];
-        gb.phase += dt * 13;
-        const [sx, sy] = map(u);
-        drawButterfly(g, sx * W, sy * H, gb.size * pxPerPicture, Math.atan2(du[1], du[0]) + Math.PI / 2, gb.phase, gb.colour, this.amount.garden);
-      }
-    }
-
-    // ── a few butterflies close to us, drifting round the edges of the screen ──
-    if (this.amount.fore > 0.01) {
-      for (const fb of this.fore) {
-        const t = time * 0.16 + fb.seed;
-        // keep to the sides and corners so they never sit on the words
-        const x = 0.5 + Math.sin(t) * 0.47 + Math.sin(t * 2.7) * 0.04;
-        const y = 0.5 + Math.sin(t * 1.37 + 1.1) * 0.44 + Math.cos(t * 3.1) * 0.03;
-        const dx = Math.cos(t) * 0.47 + Math.cos(t * 2.7) * 0.108, dy = Math.cos(t * 1.37 + 1.1) * 0.6;
-        fb.phase += dt * 11;
-        drawButterfly(f, x * W, y * H, fb.size * Math.min(W, H) * 1.3, Math.atan2(dy * H, dx * W) + Math.PI / 2, fb.phase, fb.colour, this.amount.fore);
-      }
-    }
+    // ── butterflies in the meadow (3D, lit by the hour) ──
+    this.meadow.frame(g, dpr, W, H, time, dt, this.amount.garden, map, pxPerPicture, this.light);
 
     // ── the swarm ──
     if (this.swarmers.length) {
@@ -410,10 +325,44 @@ export class Life {
         s.x += s.vx * dt;
         s.y += s.vy * dt;
         s.phase += dt * (16 + 200 / s.size);
-        drawButterfly(s.size > Math.min(W, H) * 0.18 ? f : g, s.x, s.y, s.size, Math.atan2(s.vy, s.vx) + Math.PI / 2, s.phase, s.colour);
+        // drawn in 3D: x right, y up, z into the screen (shown at a slant, so turning ones foreshorten)
+        const k = s.size;
+        const fwd = norm([s.vx, -s.vy + s.speed * 0.15, s.vz] as V3);
+        const up = norm([0, 0.3, -1] as V3);
+        const upOrtho = norm([up[0] - fwd[0] * (up[0] * fwd[0] + up[1] * fwd[1] + up[2] * fwd[2]), up[1] - fwd[1] * (up[0] * fwd[0] + up[1] * fwd[1] + up[2] * fwd[2]), up[2] - fwd[2] * (up[0] * fwd[0] + up[1] * fwd[1] + up[2] * fwd[2])] as V3);
+        const open = 0.5 + 0.9 * Math.sin(s.phase);
+        drawButterfly3D(s.size > Math.min(W, H) * 0.18 ? f : g, dpr, [s.x, s.y], [[k, 0, 0.3 * k], [0, -k, -0.35 * k]], fwd, upOrtho, 1, open, s.colour, this.light);
       }
       this.swarmers = this.swarmers.filter((s) => s.x < W + s.size && s.y > -s.size * 2 && s.x > -W);
       if (this.swarmDone && this.swarmers.length < 6) { this.swarmDone(); this.swarmDone = null; }
+    }
+
+    // ── the fireflies' heart ──
+    if (this.heartT >= 0) {
+      this.heartT += dt;
+      const T = this.heartT, gather = 2.6, leave = this.heartLen;
+      g.globalCompositeOperation = 'lighter';
+      for (const h of this.heartSparks) {
+        const t = clamp((T - h.delay) / gather);
+        const e = t * t * (3 - 2 * t);
+        const out = clamp((T - leave) / 2.5);
+        const wob = 6 * (1 - e * 0.7);
+        let x = h.from[0] + (h.to[0] - h.from[0]) * e + Math.sin(T * 1.7 + h.seed) * wob;
+        let y = h.from[1] + (h.to[1] - h.from[1]) * e + Math.cos(T * 1.3 + h.seed) * wob;
+        x += Math.sin(h.seed * 7) * out * 60;
+        y -= out * 80;
+        const pulse = 0.75 + 0.25 * Math.sin(T * 2.2 + h.seed);
+        const a = clamp(T / 0.6) * (1 - out) * pulse;
+        const r = 9 + 5 * e;
+        g.globalAlpha = a * 0.8;
+        g.drawImage(this.fireGlow, x - r, y - r, r * 2, r * 2);
+        g.globalAlpha = a;
+        g.fillStyle = '#fbffe0';
+        g.fillRect(x - 1.2, y - 1.2, 2.4, 2.4);
+      }
+      g.globalCompositeOperation = 'source-over';
+      g.globalAlpha = 1;
+      if (T > leave + 2.5) this.heartT = -1;
     }
 
     // ── petals: thrown out fast, then tumbling and drifting down ──

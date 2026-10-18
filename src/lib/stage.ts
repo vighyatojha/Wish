@@ -33,7 +33,7 @@ precision highp float;
 in vec2 vUv;
 out vec4 outColor;
 
-uniform sampler2D uEmpty, uBus, uVideo, uMask, uMask2, uNoise, uLamp, uMoonTex;
+uniform sampler2D uEmpty, uBus, uVideo, uMask, uMask2, uNoise, uLamp, uMoonTex, uMorning;
 uniform vec3  uW;               // weights: empty stop · video · parked bus
 uniform vec2  uOffset, uSpan, uZoomC;
 uniform float uZoom, uTime, uAspect, uScreenAspect;
@@ -50,6 +50,10 @@ uniform float uDoorMid;
 uniform vec4  uLampRect;        // x0, y0, x1, y1 in the picture
 uniform float uLampOn;          // 0 off → 1 lit
 uniform float uMoonR;
+uniform float uMorn;            // her sunrise picture (1) → the day picture (0)
+uniform float uDawn;            // before sunrise: cool and dim, a pink horizon
+uniform float uMist;            // low mist over the fields
+uniform float uNoon;            // midday clarity
 
 float gLod;
 float noise(vec2 p) { return texture(uNoise, p).r; }
@@ -92,7 +96,11 @@ vec3 parked(vec2 uv) {
 
 vec3 pic(vec2 uv) {
   vec3 c = vec3(0.0);
-  if (uW.x > 0.001) c += uW.x * img(uEmpty, uv);
+  if (uW.x > 0.001) {
+    vec3 e = uMorn < 0.999 ? img(uEmpty, uv) : vec3(0.0);
+    if (uMorn > 0.001) e = mix(e, img(uMorning, uv), uMorn);
+    c += uW.x * e;
+  }
   if (uW.y > 0.001) c += uW.y * texture(uVideo, uv).rgb;
   if (uW.z > 0.001) c += uW.z * parked(uv);
   return c;
@@ -199,6 +207,32 @@ void main() {
     col = mix(col, wet, uRain);
   }
 
+  // ── early morning: before sunrise it's cool and dim, with a pink horizon ──
+  if (uDawn > 0.001) {
+    float l = luma(col);
+    float h = smoothstep(0.0, 0.5, uv.y);
+    vec3 land = mix(vec3(l), col, 0.55) * vec3(0.58, 0.6, 0.78) * 0.8;
+    vec3 grad = mix(vec3(0.3, 0.36, 0.6), vec3(1.0, 0.7, 0.62), h * h);
+    vec3 skyc = mix(grad * 0.85, mix(vec3(0.55, 0.5, 0.68), vec3(1.0, 0.84, 0.78), l), smoothstep(0.45, 0.85, l));
+    col = mix(col, mix(land, skyc, sky), uDawn);
+  }
+  // ── low mist lying over the fields, drifting ──
+  if (uMist > 0.001) {
+    // a soft band lying on the far fields, thickest at the horizon, thinning towards us
+    float band = smoothstep(0.52, 0.6, uv.y) * (1.0 - smoothstep(0.6, 0.74, uv.y));
+    float n = textureLod(uNoise, uv * vec2(0.9, 2.2) + vec2(t * 0.006, 0.0), 2.0).r * 0.65
+            + textureLod(uNoise, uv * vec2(1.7, 4.0) - vec2(t * 0.01, 0.0), 2.0).r * 0.35;
+    float a = band * (0.55 + 0.45 * smoothstep(0.3, 0.7, n)) * uMist * (1.0 - m2.r * uW.z);
+    vec3 mc = mix(vec3(0.8, 0.84, 0.93), vec3(1.0, 0.92, 0.84), 1.0 - uDawn);
+    col = mix(col, mc, a * 0.5);
+    col = mix(col, mc, smoothstep(0.62, 0.47, uv.y) * (1.0 - sky) * uMist * 0.3); // haze on the hills
+  }
+  // ── midday: clear and vivid ──
+  if (uNoon > 0.001) {
+    vec3 v = mix(vec3(luma(col)), col, 1.12);
+    col = mix(col, (v - 0.5) * 1.05 + 0.51, uNoon * 0.8);
+  }
+
   // ── time of day ──
   if (uNight > 0.001) {
     int i = int(floor(uNight));
@@ -207,13 +241,15 @@ void main() {
   }
 
   // ── lights coming on as it gets dark ──
-  float dark = smoothstep(2.3, 3.6, uNight);
+  float dark = smoothstep(1.8, 3.2, uNight);
   if (dark > 0.001) {
     bool vending = uv.x > 0.53;
     float spill = textureLod(uMask, uv, 5.0).g;
     if (vending) {
-      col = mix(col, orig * 1.25 + vec3(0.18, 0.22, 0.28) * m.g, m.g * dark * 0.92);
-      col += vec3(0.6, 0.78, 1.0) * spill * 0.4 * dark * (1.0 - m.g);
+      // (hidden behind the parked bus)
+      float seen = 1.0 - m2.r * uW.z;
+      col = mix(col, orig * 1.25 + vec3(0.18, 0.22, 0.28) * m.g, m.g * dark * 0.92 * seen);
+      col += vec3(0.6, 0.78, 1.0) * spill * 0.4 * dark * (1.0 - m.g) * seen;
     } else {
       col = mix(col, vec3(1.0, 0.8, 0.5) * (0.45 + 0.6 * luma(orig)), m.g * uW.z * dark * 0.85);
       col += vec3(1.0, 0.75, 0.45) * spill * 0.22 * uW.z * dark * (1.0 - m.g);
@@ -278,6 +314,10 @@ export interface StageFrame {
   weights: [number, number, number]; // empty · video · parked bus
   rain: number;
   night: number;
+  morn: number;
+  dawn: number;
+  mist: number;
+  noon: number;
   door: number;
   wind: number;
   cloud: number;
@@ -291,6 +331,7 @@ export interface StagePictures {
   masks2: string;
   lamp: string;
   moon: string;
+  morning: string;
   width: number;
   height: number;
 }
@@ -328,7 +369,7 @@ export class Stage {
     // (the pictures first: the drawing surface is only made once there is something to draw)
     let imgs: HTMLImageElement[];
     try {
-      imgs = await Promise.all([pics.empty, pics.bus, pics.masks, pics.masks2, pics.lamp, pics.moon].map(loadImage));
+      imgs = await Promise.all([pics.empty, pics.bus, pics.masks, pics.masks2, pics.lamp, pics.moon, pics.morning].map(loadImage));
     } catch (err) {
       console.warn('Animated background unavailable (a picture did not load), showing the still picture:', err);
       return null;
@@ -347,7 +388,7 @@ export class Stage {
     private canvas: HTMLCanvasElement,
     private gl: WebGL2RenderingContext,
     pics: StagePictures,
-    [empty, bus, masks, masks2, lamp, moonTex]: HTMLImageElement[],
+    [empty, bus, masks, masks2, lamp, moonTex, morning]: HTMLImageElement[],
     private video: HTMLVideoElement,
     private maxDpr: number,
   ) {
@@ -359,7 +400,7 @@ export class Stage {
     this.u = uniforms(gl, this.program, [
       'uEmpty', 'uBus', 'uVideo', 'uMask', 'uMask2', 'uNoise', 'uW', 'uOffset', 'uSpan', 'uZoomC', 'uZoom', 'uTime',
       'uAspect', 'uScreenAspect', 'uLod', 'uFocus', 'uRain', 'uNight', 'uDoor', 'uWind', 'uCloud', 'uMoon', 'uDoorRect', 'uDoorMid',
-      'uLamp', 'uLampRect', 'uLampOn', 'uMoonR', 'uMoonTex',
+      'uLamp', 'uLampRect', 'uLampOn', 'uMoonR', 'uMoonTex', 'uMorning', 'uMorn', 'uDawn', 'uMist', 'uNoon',
     ] as const);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     this.textures = [
@@ -370,6 +411,7 @@ export class Stage {
       createTexture(gl, 5, makeFogNoise(256), { repeat: true }),
       createTexture(gl, 6, lamp),
       createTexture(gl, 7, moonTex, { mipmaps: true }),
+      createTexture(gl, 8, morning, { mipmaps: true }),
     ];
     this.videoTex = createTexture(gl, 2, null);
     const u = this.u;
@@ -381,6 +423,7 @@ export class Stage {
     gl.uniform1i(u.uNoise, 5);
     gl.uniform1i(u.uLamp, 6);
     gl.uniform1i(u.uMoonTex, 7);
+    gl.uniform1i(u.uMorning, 8);
     gl.uniform4f(u.uLampRect, LAMP.x0, LAMP.y0, LAMP.x1, LAMP.y1);
     gl.uniform1f(u.uMoonR, MOON_R);
     gl.uniform1f(u.uAspect, pics.width / pics.height);
@@ -411,7 +454,9 @@ export class Stage {
   render(f: StageFrame): void {
     const { gl, u, video } = this;
     // copy the newest video frame across while the bus is arriving
-    if (f.weights[1] > 0.001 && video.readyState >= 2 && video.currentTime !== this.lastVideoTime) {
+    // (while the film plays, every new frame is copied, even before it's faded in: otherwise
+    // the first frame never arrives and the bus could only fade in like a ghost)
+    if ((f.weights[1] > 0.001 || !video.paused) && video.readyState >= 2 && video.currentTime !== this.lastVideoTime) {
       this.lastVideoTime = video.currentTime;
       gl.activeTexture(gl.TEXTURE2);
       gl.bindTexture(gl.TEXTURE_2D, this.videoTex);
@@ -439,6 +484,10 @@ export class Stage {
     gl.uniform1f(u.uWind, f.wind);
     gl.uniform1f(u.uCloud, f.cloud);
     gl.uniform1f(u.uLampOn, f.lamp);
+    gl.uniform1f(u.uMorn, f.morn);
+    gl.uniform1f(u.uDawn, f.dawn);
+    gl.uniform1f(u.uMist, f.mist);
+    gl.uniform1f(u.uNoon, f.noon);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     // self-check, about once a second: read three pixels of what was just drawn.

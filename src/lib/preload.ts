@@ -16,16 +16,17 @@ import masksUrl from '../assets/stop-masks.webp';
 import masks2Url from '../assets/stop-masks2.webp';
 import lampUrl from '../assets/street-lamp.webp';
 import moonUrl from '../assets/moon.webp';
+import morningUrl from '../assets/stop-morning.webp';
 import filmUrl from '../assets/bus-arrives.mp4';
 import birdsongUrl from '../assets/birdsong.m4a';
 
-export const PICTURES = { empty: emptyUrl, bus: busUrl, masks: masksUrl, masks2: masks2Url, lamp: lampUrl, moon: moonUrl };
+export const PICTURES = { morning: morningUrl, empty: emptyUrl, bus: busUrl, masks: masksUrl, masks2: masks2Url, lamp: lampUrl, moon: moonUrl };
 export type PictureKey = keyof typeof PICTURES;
 export type Pictures = Record<PictureKey, string>;
 
 // Rough sizes, used for the progress bar until the server reports the real ones.
 const GUESS: Record<string, number> = {
-  [emptyUrl]: 260e3, [busUrl]: 255e3, [masksUrl]: 19e3, [masks2Url]: 138e3, [lampUrl]: 7e3, [moonUrl]: 38e3,
+  [emptyUrl]: 260e3, [busUrl]: 255e3, [masksUrl]: 19e3, [masks2Url]: 138e3, [lampUrl]: 7e3, [moonUrl]: 38e3, [morningUrl]: 250e3,
   [filmUrl]: 1.03e6, [birdsongUrl]: 108e3,
 };
 
