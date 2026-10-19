@@ -39,7 +39,7 @@ import {
 } from '../lib/audio';
 import { dayLook, formatHour, DAY_START, DAY_END, SECONDS_PER_HOUR, type DayLook } from '../lib/clock';
 import { norm, type V3 } from '../lib/wings';
-import { Bloom, loadFlower, type FlowerKind } from '../lib/bloom';
+import { Bloom, loadFlower, preloadFlowers, type FlowerKind } from '../lib/bloom';
 import { TypeGarden } from '../lib/typegarden';
 import { saveResponse } from '../lib/firebase';
 import { Fog } from '../lib/fog';
@@ -706,6 +706,9 @@ export function BusStop({ flying, entered }: Props) {
     S.hour = ({ pluck: 7.2, bus: BUS_HOUR - 0.15, animals: ANIMAL_HOURS[0], question: QUESTION_HOUR, bouquet: DAY_END } as Record<string, number>)[skip ?? ''] ?? DAY_START;
     S.clock = true;
     setUi((u) => ({ ...u, clock: true }));
+    // once the story's own files are in (pictures, bus film, birdsong), fetch the middle flower of each kind,
+    // so whichever she chooses has its first flower ready long before the end
+    void loadedBirdsong().then(preloadFlowers, preloadFlowers);
     if (skip === 'bouquet') {
       // (for building: ?scene=bouquet&flower=Lily goes straight to the last gift)
       const f = new URLSearchParams(location.search).get('flower');
@@ -1139,7 +1142,7 @@ export function BusStop({ flying, entered }: Props) {
   // ── her flower: the screen goes black; from a seed and its roots, a bunch of her flowers grows ──
   async function bouquet(kind: FlowerKind) {
     const { W, H } = mapRef.current;
-    const art = loadFlower(kind);
+    void loadFlower(kind); // (normally long since here; the bloom starts either way and waits for any still coming)
     // everything fades into black
     if (finaleEl.current) gsap.to(finaleEl.current, { autoAlpha: 0, y: -24, duration: 1.2, ease: ease.exit });
     gsap.to(svg.current, { opacity: 0, duration: 1.4, ease: 'sine.inOut' });
@@ -1150,7 +1153,9 @@ export function BusStop({ flying, entered }: Props) {
     await wait(0.6);
     const canvas = bouquetCanvas.current!;
     canvas.style.visibility = 'visible';
-    const bq = new Bloom(canvas, await art.then(live));
+    live(0);
+    const bq = new Bloom(canvas, kind);
+    bq.waitingText = content.finale.flowersComing;
     bq.resize(W, H);
     const onResize = () => bq.resize(window.innerWidth, window.innerHeight);
     window.addEventListener('resize', onResize);

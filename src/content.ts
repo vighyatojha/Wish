@@ -100,6 +100,8 @@ export const content = {
     countdown: 'one more surprise',
     // …and these words grow out of the dark above it, with roses on their letters
     gardenWords: 'for Varsha',
+    // (only on a slow connection, if her flowers are still on their way when it's time for them to open)
+    flowersComing: 'her flowers are on their way…',
   },
 
   // The small round button in the corner

@@ -58,15 +58,23 @@ function tell() {
   pending = requestAnimationFrame(() => { pending = 0; const p = progress(); listeners.forEach((cb) => cb(p)); });
 }
 
-/** Downloads one file with progress. Gives up on a stall (no bytes for 25 s) and tries again, twice. */
+/** when any download last received bytes (a file waiting its turn behind others isn't stuck) */
+let lastByteAt = 0;
+
+/** Downloads one file with progress. Gives up on a real stall (no bytes for this file, and none for
+ *  any other either, for 25 s) and tries again, twice. */
 async function download(url: string): Promise<string> {
   if (!location.protocol.startsWith('http')) return url;
   for (let attempt = 0; attempt < 3; attempt++) {
     const ctrl = new AbortController();
-    let stall = 0;
-    const poke = () => { clearTimeout(stall); stall = window.setTimeout(() => ctrl.abort(), 25000); };
+    let stall = 0, mine = performance.now();
+    const check = () => {
+      const quiet = performance.now() - Math.max(mine, lastByteAt);
+      if (quiet > 25000) ctrl.abort(); else stall = window.setTimeout(check, 5000);
+    };
+    const poke = () => { mine = lastByteAt = performance.now(); };
     try {
-      poke();
+      stall = window.setTimeout(check, 5000);
       const res = await fetch(url, { signal: ctrl.signal });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
       const len = Number(res.headers.get('content-length'));

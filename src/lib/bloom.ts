@@ -79,26 +79,42 @@ function dimmed(img: HTMLImageElement): HTMLCanvasElement {
   return c;
 }
 const cache = new Map<string, Promise<Art | null>>();
+/** One picture (tried up to three times on a bad connection). Resolves null if it can't be had. */
 function loadArt(v: Variant): Promise<Art | null> {
   const key = v.url;
-  if (!cache.has(key)) cache.set(key, new Promise((res) => {
-    const img = new Image();
-    img.onload = () => res({ img, dim: dimmed(img), glow: glowSprite(v.glow, 0.9), w: img.naturalWidth, h: img.naturalHeight, pivot: v.pivot, star: !!v.star });
-    img.onerror = () => res(null);
-    img.src = v.url;
-  }));
+  if (!cache.has(key)) {
+    const once = () => new Promise<HTMLImageElement | null>((res) => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => res(img);
+      img.onerror = () => res(null);
+      img.src = v.url;
+    });
+    const p = (async () => {
+      for (let i = 0; i < 3; i++) {
+        const img = await once();
+        if (img) return { img, dim: dimmed(img), glow: glowSprite(v.glow, 0.9), w: img.naturalWidth, h: img.naturalHeight, pivot: v.pivot, star: !!v.star };
+        await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+      }
+      cache.delete(key); // (so a later call tries again)
+      return null;
+    })();
+    cache.set(key, p);
+  }
   return cache.get(key)!;
 }
 
-/** Loads every picture for this flower's bunch. Call early: they're ready before they're needed. */
-export async function loadFlower(kind: FlowerKind): Promise<Art[]> {
-  const arts = await Promise.all(BUNCH[kind].map(loadArt));
-  const ok = arts.filter((a): a is Art => !!a);
-  return arts.map((a) => a || ok[0]).filter(Boolean) as Art[];
+/** Starts loading every picture for this flower's bunch (the middle one first). Call early. */
+export function loadFlower(kind: FlowerKind): Promise<(Art | null)[]> {
+  return Promise.all(BUNCH[kind].map(loadArt));
+}
+/** The middle flower of every kind: small, so it's worth having before she even chooses. */
+export function preloadFlowers(): void {
+  (Object.keys(BUNCH) as FlowerKind[]).forEach((k) => void loadArt(BUNCH[k][0]));
 }
 
 interface Root { pts: P2[]; t0: number; dur: number; w: number }
-interface Head { art: Art; main: boolean; tip: P2; bow: number; t0: number; dur: number; size: number; spin: number; depth: number; seed: number; leaves: { u: number; side: number; L: number }[] }
+interface Head { vi: number; star: boolean; waited: number; art?: Art; main: boolean; tip: P2; bow: number; t0: number; dur: number; size: number; spin: number; depth: number; seed: number; leaves: { u: number; side: number; L: number }[] }
 interface Mote { x: number; y: number; vx: number; vy: number; life: number; age: number; r: number; tw: number }
 
 const BLUE = [110, 180, 255] as const;
@@ -107,7 +123,6 @@ const WEDGES: Record<number, number[]> = {};
 export class Bloom {
   private g: CanvasRenderingContext2D;
   private W = 1; private H = 1; private dpr = 1;
-  private t0 = 0;
   private raf = 0;
   private roots: Root[] = [];
   private heads: Head[] = [];
@@ -118,10 +133,37 @@ export class Bloom {
   /** moments worth a sound: 'land' (the seed) and 'bloom' (each flower opening) */
   onCue: (cue: 'land' | 'bloom') => void = () => {};
 
-  constructor(private canvas: HTMLCanvasElement, private arts: Art[]) {
+  /** shown softly under the roots only if a picture is still downloading when its flower should open */
+  waitingText = '';
+  /** her pictures as they arrive: undefined = still coming, null = couldn't be had */
+  private arts: (Art | null | undefined)[];
+  private variants: Variant[];
+  /** the bloom's own clock: it holds still (only the motes move) while a picture is still on its way */
+  private clock = 0;
+  private lastNow = 0;
+  private waiting = 0;
+
+  constructor(private canvas: HTMLCanvasElement, private kind: FlowerKind) {
     this.g = canvas.getContext('2d')!;
     this.glowSprite = glowSprite([110, 180, 255]);
+    this.variants = BUNCH[kind];
+    this.arts = this.variants.map(() => undefined);
+    this.variants.forEach((v, i) => void loadArt(v).then((a) => { this.arts[i] = a; }));
     this.plan();
+  }
+
+  /** the picture for this flower: its own, or once it has waited long enough (or failed), any that has arrived */
+  private artOf(h: Head): Art | undefined {
+    if (h.art) return h.art; // (once chosen it stays: no swapping pictures mid-bloom)
+    const own = this.arts[h.vi];
+    if (own) return (h.art = own);
+    if (own === null || h.waited > (h.main ? 20 : 8)) h.art = this.arts.find((a): a is Art => !!a);
+    return h.art;
+  }
+  /** a flower that should be showing by now but has no picture yet (and might still get one) */
+  private blocked(): Head | undefined {
+    if (this.arts.every((a) => a === null)) return undefined; // (nothing will come: carry on without)
+    return this.heads.find((h) => this.clock >= h.t0 + h.dur * 0.8 && !this.artOf(h));
   }
 
   private plan() {
@@ -140,21 +182,20 @@ export class Bloom {
 
     // a bunch: the first one in the middle, then the others around it, each its own colour;
     // depth 0 = behind (a little dimmer), 2 = in front
-    const H = (art: Art, main: boolean, tip: P2, bow: number, t0: number, dur: number, size: number, spin: number, depth: number): Head => ({
-      art, main, tip, bow, t0, dur, size, spin, depth, seed: r() * 100,
+    const H = (vi: number, main: boolean, tip: P2, bow: number, t0: number, dur: number, size: number, spin: number, depth: number): Head => ({
+      vi, star: !!this.variants[vi].star, waited: 0, main, tip, bow, t0, dur, size, spin, depth, seed: r() * 100,
       leaves: [{ u: 0.28 + r() * 0.1, side: r() < 0.5 ? -1 : 1, L: 0.17 + r() * 0.06 }, { u: 0.5 + r() * 0.1, side: 0, L: 0.13 + r() * 0.05 }],
     });
-    const A = this.arts;
+    const n = this.variants.length;
     // (size: the picture's larger side, as a share of the main stem's length; tulips are cups, so a little smaller)
-    const tulip = A[0].h > A[0].w;
-    const s0 = tulip ? 0.46 : 0.74;
-    this.heads.push(H(A[0], true, [0.0, -1.0], 0.03, 4.6, 3.3, s0, 0, 1));
+    const s0 = this.kind === 'Tulip' ? 0.46 : 0.74;
+    this.heads.push(H(0, true, [0.0, -1.0], 0.03, 4.6, 3.3, s0, 0, 1));
     const ring: [number, number, number, number, number][] = [ // x, y, size (× main), spin, depth
       [-0.5, -0.84, 0.8, -0.3, 0], [0.5, -0.86, 0.8, 0.3, 0], [-0.31, -0.56, 0.74, -0.16, 2], [0.32, -0.58, 0.74, 0.18, 2], [0.02, -0.66, 0.64, 0.05, 0],
     ];
     ring.forEach(([x, y, s, spin, depth], i) => {
-      const art = A[(i + 1) % A.length];
-      this.heads.push(H(art, false, [x, y], x * 0.12, 9.3 + i * 0.7, 2.6, s0 * s * (art.star ? 0.85 : 1), art.star ? spin * 2.4 : spin, depth));
+      const vi = (i + 1) % n, star = !!this.variants[vi].star;
+      this.heads.push(H(vi, false, [x, y], x * 0.12, 9.3 + i * 0.7, 2.6, s0 * s * (star ? 0.85 : 1), star ? spin * 2.4 : spin, depth));
     });
     this.heads.sort((a, b) => a.depth - b.depth);
   }
@@ -170,8 +211,17 @@ export class Bloom {
 
   /** Grows it all; resolves once the last flower has opened (it goes on glowing afterwards). */
   play(): Promise<void> {
-    this.t0 = performance.now();
-    const loop = (now: number) => { this.raf = requestAnimationFrame(loop); this.draw((now - this.t0) / 1000); };
+    this.lastNow = performance.now();
+    const loop = (now: number) => {
+      this.raf = requestAnimationFrame(loop);
+      const dt = Math.min(0.1, Math.max(0, (now - this.lastNow) / 1000));
+      this.lastNow = now;
+      const held = this.blocked();
+      if (held) { held.waited += dt; this.waiting += dt; } else { this.clock += dt; this.waiting = 0; }
+      // (the "on their way" line fades in only after a real wait, and out again once the picture is here)
+      this.hint += ((this.waiting > 1.5 ? 1 : 0) - this.hint) * Math.min(1, dt * 2.5);
+      this.draw(this.clock, held);
+    };
     this.raf = requestAnimationFrame(loop);
     return new Promise((res) => { this.done = res; });
   }
@@ -182,7 +232,8 @@ export class Bloom {
   private snap: HTMLCanvasElement | null = null;
   private settledAt = 0;
 
-  private draw(t: number) {
+  private hint = 0;
+  private draw(t: number, held?: Head) {
     const { W, H, dpr } = this;
     const last = this.heads.reduce((m, h) => Math.max(m, h.t0 + h.dur), 0);
     if (!this.snap && t > last + 4.5) {
@@ -212,8 +263,23 @@ export class Bloom {
       this.drawMotes();
       return;
     }
-    this.scene(t, true);
+    this.scene(t, true, held);
     if (t > last + 3.6 && this.done) { this.done(); this.done = undefined; }
+  }
+
+  /** while a picture is still downloading: its bud glows softly at the top of its stem, and a quiet line says so */
+  private drawWaiting(held: Head | undefined, tipAt: P2 | undefined) {
+    const g = this.g, { U } = this, now = this.lastNow / 1000;
+    if (held && tipAt) this.glow(tipAt[0], tipAt[1], U * 0.09 * (0.85 + 0.15 * Math.sin(now * 3)), 0.55 + 0.25 * Math.sin(now * 3));
+    if (this.hint < 0.01 || !this.waitingText) return;
+    const size = Math.max(14, Math.min(19, this.W * 0.038));
+    g.save();
+    g.globalAlpha = this.hint * (0.55 + 0.15 * Math.sin(now * 2));
+    g.fillStyle = 'rgb(190,215,255)';
+    g.font = `italic ${size}px "EB Garamond", Georgia, serif`;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(this.waitingText, this.W / 2, this.H * 0.16); // (up where her name will grow: empty until then)
+    g.restore();
   }
 
   private layout() {
@@ -224,7 +290,8 @@ export class Bloom {
   }
   private base(): P2 { return this.layout().base; }
 
-  private scene(t: number, live: boolean) {
+  private scene(t: number, live: boolean, held?: Head) {
+    let heldTip: P2 | undefined;
     const { g, H } = this;
     const { U, base } = this.layout();
     const P = (x: number, y: number): P2 => [base[0] + x * U, base[1] + y * U];
@@ -287,15 +354,18 @@ export class Bloom {
         const side = lf.side || (h.tip[0] >= 0 ? 1 : -1);
         this.leaf(q, ang + side * 0.75, U * lf.L * k, side * 0.6, dim);
       }
-      if (p > 0.85) {
+      if (h === held) heldTip = pts[Math.round(p * 32)];
+      const art = this.artOf(h);
+      if (p > 0.85 && art) {
         const end = pts[32], pre = pts[29];
         const dir = Math.atan2(end[1] - pre[1], end[0] - pre[0]) + Math.PI / 2;
-        flowers.push(() => this.flower(h, end, dir + h.spin * (h.art.star ? 1 : 0.35), t, U));
+        flowers.push(() => this.flower(h, art, end, dir + h.spin * (art.star ? 1 : 0.35), t, U));
       }
     }
     for (const f of flowers) f();
 
     if (!live) return;
+    this.drawWaiting(held, heldTip);
     this.spawnMotes(t);
     this.drawMotes();
   }
@@ -316,8 +386,8 @@ export class Bloom {
   }
 
   // ── a flower: the picture, opening wedge by wedge about where its petals grow from ──
-  private flower(h: Head, at: P2, dir: number, t: number, U: number) {
-    const g = this.g, A = h.art;
+  private flower(h: Head, A: Art, at: P2, dir: number, t: number, U: number) {
+    const g = this.g;
     // the bud forms as the stem finishes, waits a moment, then opens slowly
     const bloomStart = h.t0 + h.dur + (h.main ? 0.9 : 0.5);
     const open = clamp((t - bloomStart) / (h.main ? 3.4 : 2.8));
