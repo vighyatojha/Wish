@@ -343,17 +343,22 @@ export function BusStop({ flying, entered }: Props) {
     // (phones start a step lower: their screens are dense, and the painting is soft anyway)
     const QUALITY = isTouch ? [1.25, 1.0, 0.8, 0.6] : [1.5, 1.1, 0.8, 0.6];
     let quality = 0, slowFrames = 0, slowTime = 0;
-    const adapt = (rawDt: number) => {
-      // slower than ~40 frames a second for a while: draw a little coarser, until it keeps up
-      if (rawDt > 1 / 40) { slowFrames++; slowTime += rawDt; } else slowFrames = Math.max(0, slowFrames - 1);
-      if (slowFrames > 40 && slowTime > 1.2 && quality < QUALITY.length - 1) {
-        quality++;
-        slowFrames = 0;
-        slowTime = 0;
-        stage?.setMaxDpr(QUALITY[quality]);
-        life.maxDpr = Math.min(isTouch ? 1.5 : 1.75, QUALITY[quality]);
-        life.resize(W, H);
-      }
+    const setQuality = (q: number) => {
+      quality = q;
+      slowFrames = 0; slowTime = 0; fastTime = 0;
+      stage?.setMaxDpr(QUALITY[quality]);
+      life.maxDpr = Math.min(isTouch ? 1.5 : 1.75, QUALITY[quality]);
+      life.resize(W, H);
+    };
+    let fastTime = 0, settleUntil = 0, best = 0;
+    const adapt = (rawDt: number, now: number) => {
+      // (not while things are still arriving and being set up: those moments are slow once, not always)
+      if (!stageShown || now < settleUntil) return;
+      // slower than ~40 frames a second for a while: draw a little coarser, until it keeps up…
+      if (rawDt > 1 / 40) { slowFrames++; slowTime += rawDt; fastTime = 0; } else { slowFrames = Math.max(0, slowFrames - 1); fastTime += rawDt; }
+      if (slowFrames > 40 && slowTime > 1.2 && quality < QUALITY.length - 1) { best = quality + 1; setQuality(quality + 1); settleUntil = now + 2000; }
+      // …and back up again once it has been comfortably smooth for a while (never back to a level that was too slow)
+      else if (fastTime > 6 && quality > best) { setQuality(quality - 1); settleUntil = now + 3000; }
     };
 
     // ── ?debug: a small panel showing what the graphics are doing ──
@@ -397,12 +402,12 @@ export function BusStop({ flying, entered }: Props) {
       if (!flyingRef.current || S.blackout) {
         // (only the background's first-frame check, now and then, so it's ready the moment it's needed)
         if (stage && !stage.ready && ++idleFrames % 15 === 0) stage.render({ time, layout: base, zoom: 1, zoomCenter: [0.5, 0.5], blur: 0, weights: S.weights, rain: S.rain, night: 0, door: 0, wind: 0, cloud: 0, lamp: 0, morn: 1, dawn: 1, mist: 0, noon: 0 });
-        if (stage && stage.ready && !stageShown) { stageShown = true; stageCanvas.current!.style.opacity = '1'; announce(); }
+        if (stage && stage.ready && !stageShown) { stageShown = true; settleUntil = now + 4000; stageCanvas.current!.style.opacity = '1'; announce(); }
         last = 0;
         return;
       }
       pt = performance.now();
-      if (rawDt < 1) adapt(rawDt);
+      if (rawDt < 0.25) adapt(rawDt, now); // (a long gap is the tab being away, not slowness)
 
       // ── the day's clock (real time: it doesn't wait for anything; paused while the tab is hidden) ──
       if (S.clock && S.hour < DAY_END) S.hour = Math.min(DAY_END, S.hour + (Math.min(rawDt, 0.25) * SPEED) / SECONDS_PER_HOUR);
@@ -546,6 +551,7 @@ export function BusStop({ flying, entered }: Props) {
         // shown only once a frame has been checked and is a real picture
         if (stage.ready && !stageShown) {
           stageShown = true;
+          settleUntil = now + 4000;
           stageCanvas.current!.style.opacity = '1';
           // (the still picture underneath can't be seen now: take it off the screen)
           setTimeout(() => { if (still.current && !stillMode) still.current.style.visibility = 'hidden'; }, 800);
@@ -1160,8 +1166,9 @@ export function BusStop({ flying, entered }: Props) {
     const gc = gardenCanvas.current!;
     gc.style.visibility = 'visible';
     await document.fonts.load('700 100px "Playfair Display"').catch(() => {});
-    // (in the flowers' blue: blue roses, deep teal stems, white letters)
-    const tg = new TypeGarden(gc, { palette: ['night', 'transparent', '#3f86ff', '#2a7fa8', '#cfe6ff', '#f2f7ff', '#04101c'], transparent: true, interactive: false, caret: true, scale: 0.3, density: 0.7, legible: true, maxDpr: isTouch ? 1.5 : 2, font: '"Playfair Display",Georgia,serif' });
+    // (the roses take the colour of her flowers; green stems, white letters)
+    const rose = { Tulip: '#ff2e4d', Lily: '#ff5a3c', Lotus: '#ff6f9f' }[kind];
+    const tg = new TypeGarden(gc, { palette: ['night', 'transparent', rose, '#3f9a52', '#ffe2e8', '#f7f4ff', '#06210f'], transparent: true, interactive: false, caret: true, scale: 0.3, density: 0.7, legible: true, maxDpr: isTouch ? 1.5 : 2, font: '"Playfair Display",Georgia,serif' });
     gardenRef.current = tg;
     tg.start();
     for (const ch of content.finale.gardenWords) { tg.type(ch); await wait(ch === ' ' ? 0.32 : 0.2); }

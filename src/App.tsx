@@ -7,16 +7,19 @@
 //  to the address to jump straight to page 2 (sound needs the first
 //  tap, so it's silent).
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { preloadStory } from './lib/preload';
 import { Intro } from './scenes/Intro';
-import { BusStop } from './scenes/BusStop';
-import { Gallery } from './scenes/Gallery';
+// Page 2 (and the gallery) are loaded separately, so page 1 appears as soon as possible:
+// page 2's code downloads quietly while she's reading page 1.
+const loadBusStop = () => import('./scenes/BusStop');
+const BusStop = lazy(() => loadBusStop().then((m) => ({ default: m.BusStop })));
+const Gallery = lazy(() => import('./scenes/Gallery').then((m) => ({ default: m.Gallery })));
 
 const skipTo = new URLSearchParams(location.search).get('scene');
 
 export function App() {
-  if (skipTo === 'gallery') return <Gallery />;
+  if (skipTo === 'gallery') return <Suspense fallback={null}><Gallery /></Suspense>;
   const jump = ['stop', 'pluck', 'bus', 'animals', 'question', 'bouquet'].includes(skipTo ?? '');
   const [showIntro, setShowIntro] = useState(!jump);
   const [showSunrise, setShowSunrise] = useState(jump);
@@ -25,13 +28,13 @@ export function App() {
 
   // start fetching page 2 shortly after page 1 appears
   useEffect(() => {
-    const id = window.setTimeout(preloadStory, jump ? 0 : 1200);
+    const id = window.setTimeout(() => { void loadBusStop(); preloadStory(); }, jump ? 0 : 1200);
     return () => clearTimeout(id);
   }, [jump]);
 
   return (
     <main>
-      {showSunrise && <BusStop flying={flying} entered={sunriseInCharge} />}
+      {showSunrise && <Suspense fallback={null}><BusStop flying={flying} entered={sunriseInCharge} /></Suspense>}
       {showIntro && (
         <Intro
           onRainStart={() => setShowSunrise(true)}

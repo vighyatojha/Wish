@@ -374,6 +374,7 @@ export class Stage {
   private firstFrameAt = 0;
   private probeBuf = new Uint8Array(4 * 3);
   private lastProbe = 0;
+  private probesLeft = 4;
 
   /** Returns null when the phone has no WebGL2 (the still picture is shown instead). */
   static async create(canvas: HTMLCanvasElement, pics: StagePictures, video: HTMLVideoElement, maxDpr = 1.5): Promise<Stage | null> {
@@ -507,8 +508,12 @@ export class Stage {
     this.stats.frames++;
     const now = performance.now();
     if (!this.firstFrameAt) this.firstFrameAt = now;
-    // until it's proven to draw, check every frame; after that, about once a second
-    if (!this.ready || now - this.lastProbe > 1000) {
+    // Until it's proven to draw, check every frame; after that only a few times in its first
+    // ten seconds, then never again: reading pixels back makes the graphics card stop and wait
+    // (a visible hitch, ~70 ms on a laptop), so it mustn't happen while she's watching.
+    const due = !this.ready || (this.probesLeft > 0 && now - this.lastProbe > 2500);
+    if (due) {
+      if (this.ready) this.probesLeft--;
       this.lastProbe = now;
       const err = gl.getError();
       if (err) this.stats.glError = err;
