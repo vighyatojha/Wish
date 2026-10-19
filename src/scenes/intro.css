@@ -104,3 +104,31 @@
 .intro__paper { display: none; z-index: 1; }
 .intro__rain { z-index: 2; }
 .intro.is-wet .intro__paper { display: block; }
+
+/* Landscape (a phone turned sideways, or a laptop): everything in one centred column */
+@media (orientation: landscape) {
+  .intro__page {
+    grid-template-rows: auto auto;
+    align-content: center;
+    justify-items: center;
+    row-gap: clamp(1rem, 5svh, 2.6rem);
+    padding: max(16px, env(safe-area-inset-top)) var(--gutter) max(16px, env(safe-area-inset-bottom));
+    text-align: center;
+  }
+  .intro__form { align-self: auto; align-items: center; margin-top: 0; }
+  .intro__question { max-width: 22em; }
+  .intro__feedback { text-align: center; }
+}
+/* a phone held sideways is short: a smaller name, tighter spacing */
+@media (orientation: landscape) and (max-height: 520px) {
+  .intro__hello { font-size: var(--step-1); }
+  .intro__name { font-size: clamp(2.4rem, 14svh, 3.6rem); }
+  .intro__question { font-size: var(--step-0); }
+  .intro__input { margin-top: 0.7rem; font-size: var(--step-0); }
+  .intro__submit { margin-top: 0.9rem; padding: 0.45rem 1.2rem 0.5rem; }
+  .intro__feedback { margin-top: 0.5rem; min-height: 1.2em; }
+}
+/* sideways with the keyboard up, there's only room for the question */
+@media (orientation: landscape) and (max-height: 260px) {
+  .intro__greeting { display: none; }
+}

@@ -58,7 +58,8 @@ uniform float uNoon;            // midday clarity
 float gLod;
 float noise(vec2 p) { return texture(uNoise, p).r; }
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+// (a cheap hash with no sine in it: it runs for every pixel of the night sky)
+float hash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 
 vec3 img(sampler2D t, vec2 uv) {
   if (gLod < 0.05) return texture(t, uv).rgb;
@@ -142,10 +143,10 @@ vec3 look(int k, vec3 col, vec2 uv, float sky) {
   vec3 grad = mix(vec3(0.012, 0.02, 0.07), vec3(0.055, 0.075, 0.17), h);
   vec3 cl = mix(vec3(0.045, 0.055, 0.11), vec3(0.2, 0.22, 0.34), l);
   vec3 s = mix(grad, cl, cloud);
-  // stars where the sky is clear
+  // stars where the sky is clear (only worked out where there is sky)
   vec2 g = uv * vec2(uAspect, 1.0) * 160.0;
   vec2 id = floor(g);
-  float r = hash(id);
+  float r = sky > 0.02 ? hash(id) : 1.0;
   if (r < 0.06) {
     vec2 c = fract(g) - 0.5 - (vec2(hash(id + 3.1), hash(id + 7.7)) - 0.5) * 0.6;
     float tw = 0.55 + 0.45 * sin(uTime * (1.0 + r * 30.0) + r * 60.0);
@@ -237,7 +238,10 @@ void main() {
   if (uNight > 0.001) {
     int i = int(floor(uNight));
     float f = fract(uNight);
-    col = mix(look(i, col, uv, sky), look(min(i + 1, 4), col, uv, sky), f);
+    // (the next look only while it's actually blending in: at full night, once)
+    vec3 a = look(i, col, uv, sky);
+    if (f > 0.002 && i < 4) a = mix(a, look(i + 1, col, uv, sky), f);
+    col = a;
   }
 
   // ── lights coming on as it gets dark ──
@@ -274,11 +278,13 @@ void main() {
       vec4 M = texture(uMoonTex, mq);
       col = mix(col, M.rgb, M.a * moon * mix(1.0, clear, 0.6) * sky);
     }
-    float halo = exp(-max(0.0, r - R * 1.25) * 14.0) * 0.12 + exp(-r * 4.5) * 0.08;
-    col += vec3(0.62, 0.68, 0.85) * halo * moon * sky;
-    // the edges of nearby clouds catch the moonlight
-    float cl = smoothstep(0.45, 0.8, luma(orig)) * sky;
-    col += vec3(0.22, 0.25, 0.36) * cl * exp(-r * 3.2) * moon;
+    if (r < 1.1 && sky > 0.01) {
+      float halo = exp(-max(0.0, r - R * 1.25) * 14.0) * 0.12 + exp(-r * 4.5) * 0.08;
+      col += vec3(0.62, 0.68, 0.85) * halo * moon * sky;
+      // the edges of nearby clouds catch the moonlight
+      float cl = smoothstep(0.45, 0.8, luma(orig)) * sky;
+      col += vec3(0.22, 0.25, 0.36) * cl * exp(-r * 3.2) * moon;
+    }
     // the hills shine softly under the full moon
     float hills = smoothstep(0.42, 0.47, uv.y) * smoothstep(0.62, 0.54, uv.y) * (1.0 - sky) * (1.0 - m2.r * uW.z)
                 * clamp((orig.b - orig.r) * 3.5, 0.0, 1.0);
@@ -292,13 +298,18 @@ void main() {
     if (luv.x > 0.27 && luv.x < 0.73 && luv.y > 0.07 && luv.y < 0.15) glass = lampA;
     col = mix(col, vec3(1.0, 0.86, 0.58) * 1.25, glass * uLampOn);
     vec2 dh = (uv - head) * vec2(uAspect, 1.0);
-    col += vec3(1.0, 0.78, 0.45) * (exp(-length(dh) * 55.0) * 0.55 + exp(-length(dh) * 14.0) * 0.12) * uLampOn;
-    // a soft cone of light and a warm pool on the ground beneath it
-    float below = uv.y - head.y;
-    float cone = below > 0.0 ? exp(-pow(abs(uv.x - head.x) * uAspect / (0.02 + below * 0.32), 2.0)) * exp(-below * 4.5) : 0.0;
-    col += vec3(1.0, 0.8, 0.5) * cone * 0.07 * uLampOn * (1.0 - lampA);
-    vec2 dp = (uv - vec2(head.x, uLampRect.w + 0.02)) * vec2(uAspect * 1.1, 3.6);
-    col += vec3(1.0, 0.76, 0.46) * exp(-dot(dp, dp) * 30.0) * 0.28 * uLampOn * (1.0 - sky);
+    float dl = length(dh);
+    // (all of the lamp's light falls off within a short distance: elsewhere, nothing to add)
+    if (dl < 0.45) {
+      col += vec3(1.0, 0.78, 0.45) * (exp(-dl * 55.0) * 0.55 + exp(-dl * 14.0) * 0.12) * uLampOn;
+      // a soft cone of light and a warm pool on the ground beneath it
+      float below = uv.y - head.y;
+      float sx = abs(uv.x - head.x) * uAspect / (0.02 + max(below, 0.0) * 0.32);
+      float cone = below > 0.0 ? exp(-sx * sx) * exp(-below * 4.5) : 0.0;
+      col += vec3(1.0, 0.8, 0.5) * cone * 0.07 * uLampOn * (1.0 - lampA);
+      vec2 dp = (uv - vec2(head.x, uLampRect.w + 0.02)) * vec2(uAspect * 1.1, 3.6);
+      col += vec3(1.0, 0.76, 0.46) * exp(-dot(dp, dp) * 30.0) * 0.28 * uLampOn * (1.0 - sky);
+    }
   }
 
   outColor = vec4(col, 1.0);

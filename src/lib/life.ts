@@ -95,7 +95,9 @@ export class Life {
 
   /** 0 → 1: how much of each is showing */
   amount = { garden: 0, birds: 0, fireflies: 0 };
-  maxDpr = 1.75;
+  maxDpr = window.matchMedia?.('(pointer: coarse)').matches ? 1.5 : 1.75;
+  /** whether anything was drawn on the front layer last frame (if not, it can leave the screen) */
+  frontUsed = true;
   /** the light of the hour (the butterflies are lit by it) */
   light: Light = NEUTRAL;
   /** the part of the picture on screen (u range) */
@@ -239,6 +241,7 @@ export class Life {
 
   frame(time: number, dt: number, map: (uv: Vec2) => Vec2, pxPerPicture: number) {
     const { g, f, W, H, dpr } = this;
+    this.frontUsed = this.amount.fireflies > 0.01 || this.swarmers.length > 0 || this.petals.length > 0 || this.motes.length > 0;
     for (const c of [g, f]) {
       c.setTransform(dpr, 0, 0, dpr, 0, 0);
       c.clearRect(0, 0, W, H);

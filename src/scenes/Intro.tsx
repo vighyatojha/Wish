@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 //  Page 1: the white page
 //
-//  1. "Tap to begin"  → sound on, fullscreen, portrait lock
+//  1. "Tap to begin"  → sound on, fullscreen, turned to landscape
 //  2. Greeting + question, written in word by word
 //  3. Right answer    → rain starts, the paper soaks, the ink
 //                       runs, and the sheet falls apart to reveal

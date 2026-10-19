@@ -1,22 +1,24 @@
 // ─────────────────────────────────────────────────────────────
 //  Her flower, on a black screen: the last gift.
-//  A blue seed of light drops into the dark; roots spread; a sprout
-//  rises; the stem climbs, leaves unfold, and the bud opens into the
-//  flower she chose. More stems rise from the same roots until there's
-//  a bunch of them, glowing, with motes of light drifting up.
+//  A seed of light drops into the dark; roots spread; a sprout rises;
+//  the stem climbs, leaves unfold, and the bud opens into the flower
+//  she chose. More stems rise from the same roots, each opening into
+//  the same flower in another colour, until there's a bunch of them
+//  (tulips: red, pink, yellow · lilies: red, burgundy, pink, yellow,
+//  blue, crimson · lotuses: pink, white, hot pink, purple, peach, blue).
 //
-//  The lily and the lotus are her own pictures (cut out of their black
-//  backgrounds), so when they're open they look exactly like them.
+//  Every flower is one of her own pictures, cut out of its black
+//  background, so when it's open it looks exactly like the picture.
 //  They open by turning thin wedges of the picture about the point the
 //  petals grow from: folded up, the wedges make a bud; turning back out
-//  (the outer petals last) they become the flower. The tulip is painted
-//  in the same glowing blue.
+//  (the outer petals last) they become the flower.
 // ─────────────────────────────────────────────────────────────
-import lilyUrl from '../assets/flower-lily.webp';
-import lotusUrl from '../assets/flower-lotus.webp';
+import lilyBlueUrl from '../assets/flower-lily.webp';
+import lotusBlueUrl from '../assets/flower-lotus.webp';
 
 export type FlowerKind = 'Tulip' | 'Lily' | 'Lotus';
 type P2 = [number, number];
+type RGB = [number, number, number];
 
 const TAU = Math.PI * 2;
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -32,75 +34,75 @@ function bez(a: P2, b: P2, c: P2, d: P2, t: number): P2 {
   return [u * u * u * a[0] + 3 * u * u * t * b[0] + 3 * u * t * t * c[0] + t * t * t * d[0], u * u * u * a[1] + 3 * u * u * t * b[1] + 3 * u * t * t * c[1] + t * t * t * d[1]];
 }
 
-/** a flower picture and where, in it, the petals grow from (fractions of its width and height) */
-interface Art { img: CanvasImageSource; w: number; h: number; pivot: P2; core: P2; star: boolean }
-
-// her pictures: where the petals meet (the lily's centre; the lotus's base) and the glowing heart
-const META = {
-  Lily: { url: lilyUrl, pivot: [0.519, 0.63] as P2, core: [0.519, 0.6] as P2, star: true },
-  Lotus: { url: lotusUrl, pivot: [0.543, 0.728] as P2, core: [0.549, 0.511] as P2, star: false },
+// Her flower pictures, cut out of black (src/assets/flowers): each with the point its petals grow
+// from (where the stem joins; for the front-facing blue lily, its centre) and the colour of its glow.
+const FLOWER_URLS = import.meta.glob('../assets/flowers/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const url = (name: string) => FLOWER_URLS[`../assets/flowers/${name}.webp`];
+interface Variant { url: string; pivot: P2; glow: RGB; star?: boolean }
+const V = (name: string, pivot: P2, glow: RGB): Variant => ({ url: url(name), pivot, glow });
+/** the first is the one in the middle; the rest gather round it */
+const BUNCH: Record<FlowerKind, Variant[]> = {
+  Tulip: [
+    V('tulip-red', [0.467, 0.98], [196, 26, 22]), V('tulip-pink', [0.432, 0.98], [238, 96, 135]), V('tulip-yellow', [0.487, 0.987], [240, 169, 31]),
+    V('tulip-pink', [0.432, 0.98], [238, 96, 135]), V('tulip-yellow', [0.487, 0.987], [240, 169, 31]), V('tulip-red', [0.467, 0.98], [196, 26, 22]),
+  ],
+  Lily: [
+    V('lily-red', [0.44, 0.983], [219, 62, 43]), V('lily-burgundy', [0.448, 0.968], [171, 47, 87]), V('lily-small-pink', [0.445, 0.963], [218, 125, 142]),
+    V('lily-small-yellow', [0.445, 0.963], [232, 174, 29]), { url: lilyBlueUrl, pivot: [0.519, 0.63], glow: [60, 110, 255], star: true },
+    V('lily-small-crimson', [0.445, 0.951], [193, 37, 61]),
+  ],
+  Lotus: [
+    V('lotus-pink', [0.504, 0.897], [235, 144, 138]), V('lotus-white', [0.518, 0.892], [228, 198, 166]), V('lotus-hotpink', [0.497, 0.857], [233, 101, 126]),
+    V('lotus-purple', [0.464, 0.889], [179, 132, 185]), V('lotus-peach', [0.497, 0.896], [236, 168, 118]),
+    { url: lotusBlueUrl, pivot: [0.543, 0.728], glow: [70, 140, 255] },
+  ],
 };
 
-/** Loads the picture for this flower (the tulip is painted). Call early: it's ready before it's needed. */
-export function loadFlower(kind: FlowerKind): Promise<Art> {
-  if (kind === 'Tulip') return Promise.resolve(paintTulip());
-  const m = META[kind];
-  return new Promise((res) => {
+/** a flower picture, ready to draw: itself, a dimmer copy (for the ones further back), and its glow */
+interface Art { img: CanvasImageSource; dim: CanvasImageSource; glow: HTMLCanvasElement; w: number; h: number; pivot: P2; star: boolean }
+
+function glowSprite(c: RGB, core = 1): HTMLCanvasElement {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+  const x = cv.getContext('2d')!, gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+  const [r, g, b] = c;
+  gr.addColorStop(0, `rgba(${Math.min(255, r + 60)},${Math.min(255, g + 60)},${Math.min(255, b + 60)},${core})`);
+  gr.addColorStop(0.22, `rgba(${r},${g},${b},0.5)`); gr.addColorStop(0.55, `rgba(${r},${g},${b},0.12)`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
+  return cv;
+}
+function dimmed(img: HTMLImageElement): HTMLCanvasElement {
+  const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const x = c.getContext('2d')!;
+  x.drawImage(img, 0, 0);
+  x.globalCompositeOperation = 'source-atop';
+  x.fillStyle = 'rgba(0,0,0,0.3)'; x.fillRect(0, 0, c.width, c.height);
+  return c;
+}
+const cache = new Map<string, Promise<Art | null>>();
+function loadArt(v: Variant): Promise<Art | null> {
+  const key = v.url;
+  if (!cache.has(key)) cache.set(key, new Promise((res) => {
     const img = new Image();
-    img.onload = () => res({ img, w: img.naturalWidth, h: img.naturalHeight, pivot: m.pivot, core: m.core, star: m.star });
-    img.onerror = () => res(paintTulip());
-    img.src = m.url;
-  });
+    img.onload = () => res({ img, dim: dimmed(img), glow: glowSprite(v.glow, 0.9), w: img.naturalWidth, h: img.naturalHeight, pivot: v.pivot, star: !!v.star });
+    img.onerror = () => res(null);
+    img.src = v.url;
+  }));
+  return cache.get(key)!;
 }
 
-// a tulip in the same glowing blue as her pictures
-function paintTulip(): Art {
-  const W = 720, H = 640, c = document.createElement('canvas');
-  c.width = W; c.height = H;
-  const g = c.getContext('2d')!;
-  const bx = W / 2, by = H * 0.92, h = H * 0.8, w = W * 0.2;
-  const petal = (ang: number, k: number, shade: number) => {
-    g.save();
-    g.translate(bx, by);
-    g.rotate(ang);
-    const path = new Path2D();
-    path.moveTo(0, 0);
-    path.bezierCurveTo(w * 0.95 * k, -h * 0.12, w * 1.05 * k, -h * 0.76, w * 0.28 * k, -h * 0.98);
-    path.quadraticCurveTo(0, -h * 1.05, -w * 0.28 * k, -h * 0.98);
-    path.bezierCurveTo(-w * 1.05 * k, -h * 0.76, -w * 0.95 * k, -h * 0.12, 0, 0);
-    const gr = g.createLinearGradient(0, 0, 0, -h);
-    gr.addColorStop(0, 'rgba(8,30,140,0.98)'); gr.addColorStop(0.5, 'rgba(36,104,255,0.95)'); gr.addColorStop(1, 'rgba(150,205,255,0.95)');
-    g.fillStyle = gr; g.fill(path);
-    if (shade) { g.fillStyle = `rgba(0,6,40,${shade})`; g.fill(path); }
-    // a lighter middle, like light coming through
-    g.save(); g.clip(path);
-    const mid = g.createLinearGradient(-w * k, 0, w * k, 0);
-    mid.addColorStop(0, 'rgba(255,255,255,0)'); mid.addColorStop(0.5, 'rgba(190,225,255,0.28)'); mid.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = mid; g.fillRect(-w * 1.2 * k, -h * 1.1, w * 2.4 * k, h * 1.1);
-    // veins
-    g.strokeStyle = 'rgba(200,232,255,0.3)'; g.lineWidth = 1.4;
-    for (let i = -3; i <= 3; i++) { g.beginPath(); g.moveTo(i * 2, -h * 0.04); g.quadraticCurveTo(i * w * 0.18 * k, -h * 0.5, i * w * 0.12 * k, -h * 0.94); g.stroke(); }
-    // little points of light on the petal
-    const r = rng(Math.round(ang * 1000) + 7);
-    for (let i = 0; i < 14; i++) { g.fillStyle = `rgba(230,245,255,${0.5 + r() * 0.5})`; g.beginPath(); g.arc((r() - 0.5) * w * 1.3 * k, -h * (0.2 + r() * 0.7), 1 + r() * 2.2, 0, TAU); g.fill(); }
-    g.restore();
-    g.strokeStyle = 'rgba(170,215,255,0.85)'; g.lineWidth = 2; g.stroke(path);
-    g.restore();
-  };
-  petal(-0.44, 0.92, 0.32); petal(0.44, 0.92, 0.32); petal(0, 1, 0.2);
-  // the glowing heart inside the cup
-  const core = g.createRadialGradient(bx, by - h * 0.42, 0, bx, by - h * 0.42, w * 0.9);
-  core.addColorStop(0, 'rgba(235,248,255,0.95)'); core.addColorStop(0.3, 'rgba(140,200,255,0.5)'); core.addColorStop(1, 'rgba(60,120,255,0)');
-  g.globalCompositeOperation = 'lighter'; g.fillStyle = core; g.fillRect(bx - w, by - h * 0.42 - w, w * 2, w * 2); g.globalCompositeOperation = 'source-over';
-  petal(-0.2, 1.1, 0); petal(0.2, 1.1, 0);
-  return { img: c, w: W, h: H, pivot: [0.5, 0.92], core: [0.5, 0.92 - 0.8 * 0.42], star: false };
+/** Loads every picture for this flower's bunch. Call early: they're ready before they're needed. */
+export async function loadFlower(kind: FlowerKind): Promise<Art[]> {
+  const arts = await Promise.all(BUNCH[kind].map(loadArt));
+  const ok = arts.filter((a): a is Art => !!a);
+  return arts.map((a) => a || ok[0]).filter(Boolean) as Art[];
 }
 
 interface Root { pts: P2[]; t0: number; dur: number; w: number }
-interface Head { tip: P2; bow: number; t0: number; dur: number; size: number; spin: number; depth: number; seed: number; leaves: { u: number; side: number; L: number }[] }
+interface Head { art: Art; main: boolean; tip: P2; bow: number; t0: number; dur: number; size: number; spin: number; depth: number; seed: number; leaves: { u: number; side: number; L: number }[] }
 interface Mote { x: number; y: number; vx: number; vy: number; life: number; age: number; r: number; tw: number }
 
 const BLUE = [110, 180, 255] as const;
+const WEDGES: Record<number, number[]> = {};
 
 export class Bloom {
   private g: CanvasRenderingContext2D;
@@ -116,15 +118,9 @@ export class Bloom {
   /** moments worth a sound: 'land' (the seed) and 'bloom' (each flower opening) */
   onCue: (cue: 'land' | 'bloom') => void = () => {};
 
-  constructor(private canvas: HTMLCanvasElement, private art: Art) {
+  constructor(private canvas: HTMLCanvasElement, private arts: Art[]) {
     this.g = canvas.getContext('2d')!;
-    this.glowSprite = (() => {
-      const c = document.createElement('canvas'); c.width = c.height = 128;
-      const x = c.getContext('2d')!, gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
-      gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.2, 'rgba(200,230,255,0.55)'); gr.addColorStop(0.55, 'rgba(120,180,255,0.12)'); gr.addColorStop(1, 'rgba(100,160,255,0)');
-      x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
-      return c;
-    })();
+    this.glowSprite = glowSprite([110, 180, 255]);
     this.plan();
   }
 
@@ -142,24 +138,32 @@ export class Bloom {
     };
     for (const a of [Math.PI / 2, Math.PI / 2 - 0.95, Math.PI / 2 + 0.95, Math.PI / 2 - 0.42, Math.PI / 2 + 0.45]) grow(0, 0.01, a, 0.22 + r() * 0.12, 0, 1.6 + r() * 0.5);
 
-    // a bunch: the first one in the middle, then the others around it; depth 0 = behind, 2 = in front
-    const star = this.art.star;
-    const H = (tip: P2, bow: number, t0: number, dur: number, size: number, spin: number, depth: number): Head => ({
-      tip, bow, t0, dur, size, spin, depth, seed: r() * 100,
+    // a bunch: the first one in the middle, then the others around it, each its own colour;
+    // depth 0 = behind (a little dimmer), 2 = in front
+    const H = (art: Art, main: boolean, tip: P2, bow: number, t0: number, dur: number, size: number, spin: number, depth: number): Head => ({
+      art, main, tip, bow, t0, dur, size, spin, depth, seed: r() * 100,
       leaves: [{ u: 0.28 + r() * 0.1, side: r() < 0.5 ? -1 : 1, L: 0.17 + r() * 0.06 }, { u: 0.5 + r() * 0.1, side: 0, L: 0.13 + r() * 0.05 }],
     });
-    const s0 = star ? 0.58 : 0.78;
-    this.heads.push(H([0.0, -1.0], 0.03, 4.6, 3.3, s0, 0, 1));
-    const ring: [number, number, number, number, number][] = star
-      ? [[-0.42, -0.78, 0.44, -0.5, 0], [0.42, -0.8, 0.44, 0.45, 0], [-0.24, -0.5, 0.4, -0.25, 2], [0.26, -0.52, 0.4, 0.3, 2], [0.02, -0.66, 0.36, 0.9, 0]]
-      : [[-0.5, -0.82, 0.6, -0.3, 0], [0.5, -0.84, 0.6, 0.3, 0], [-0.3, -0.54, 0.54, -0.16, 2], [0.31, -0.56, 0.54, 0.18, 2]];
-    ring.forEach(([x, y, s, spin, depth], i) => this.heads.push(H([x, y], x * 0.12, 9.3 + i * 0.75, 2.6, s, spin, depth)));
+    const A = this.arts;
+    // (size: the picture's larger side, as a share of the main stem's length; tulips are cups, so a little smaller)
+    const tulip = A[0].h > A[0].w;
+    const s0 = tulip ? 0.46 : 0.74;
+    this.heads.push(H(A[0], true, [0.0, -1.0], 0.03, 4.6, 3.3, s0, 0, 1));
+    const ring: [number, number, number, number, number][] = [ // x, y, size (× main), spin, depth
+      [-0.5, -0.84, 0.8, -0.3, 0], [0.5, -0.86, 0.8, 0.3, 0], [-0.31, -0.56, 0.74, -0.16, 2], [0.32, -0.58, 0.74, 0.18, 2], [0.02, -0.66, 0.64, 0.05, 0],
+    ];
+    ring.forEach(([x, y, s, spin, depth], i) => {
+      const art = A[(i + 1) % A.length];
+      this.heads.push(H(art, false, [x, y], x * 0.12, 9.3 + i * 0.7, 2.6, s0 * s * (art.star ? 0.85 : 1), art.star ? spin * 2.4 : spin, depth));
+    });
     this.heads.sort((a, b) => a.depth - b.depth);
   }
 
   resize(W: number, H: number) {
     this.W = W; this.H = H;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // (phones: their screens are dense; 1.5× is plenty for soft, glowing flowers)
+    this.dpr = Math.min(window.devicePixelRatio || 1, window.matchMedia?.('(pointer: coarse)').matches ? 1.5 : 2);
+    this.snap = null;
     this.canvas.width = Math.round(W * this.dpr);
     this.canvas.height = Math.round(H * this.dpr);
   }
@@ -174,16 +178,57 @@ export class Bloom {
   destroy() { cancelAnimationFrame(this.raf); }
   private cue(name: string, c: 'land' | 'bloom') { if (!this.cued.has(name)) { this.cued.add(name); this.onCue(c); } }
 
+  /** the finished bunch, drawn once (it hardly changes after that: it sways a little, and the motes move) */
+  private snap: HTMLCanvasElement | null = null;
+  private settledAt = 0;
+
   private draw(t: number) {
-    const { g, W, H, dpr } = this;
+    const { W, H, dpr } = this;
+    const last = this.heads.reduce((m, h) => Math.max(m, h.t0 + h.dur), 0);
+    if (!this.snap && t > last + 4.5) {
+      // everything has opened: keep a picture of it (without the motes) and draw that from now on
+      const c = document.createElement('canvas');
+      c.width = this.canvas.width; c.height = this.canvas.height;
+      const real = this.g;
+      this.g = c.getContext('2d')!;
+      this.g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      this.scene(t, false);
+      this.g = real;
+      this.snap = c;
+      this.settledAt = t;
+    }
+    const g = this.g;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.fillStyle = '#000';
     g.fillRect(0, 0, W, H);
-    const portrait = W / H < 1;
+    if (this.snap) {
+      const [bx, by] = this.base();
+      const sw = Math.sin((t - this.settledAt) * 0.7) * 0.006;
+      g.save();
+      g.translate(bx, by); g.rotate(sw); g.translate(-bx, -by);
+      g.drawImage(this.snap, 0, 0, W, H);
+      g.restore();
+      this.spawnMotes(t);
+      this.drawMotes();
+      return;
+    }
+    this.scene(t, true);
+    if (t > last + 3.6 && this.done) { this.done(); this.done = undefined; }
+  }
+
+  private layout() {
+    const { W, H } = this, portrait = W / H < 1;
     // (on wide screens a little lower and smaller, leaving the top for her name)
     const U = Math.min(H * (portrait ? 0.46 : 0.42), W * (portrait ? 0.62 : 0.5));
-    const base: P2 = [W / 2, H * (portrait ? 0.8 : 0.88)];
+    return { U, base: [W / 2, H * (portrait ? 0.8 : 0.88)] as P2 };
+  }
+  private base(): P2 { return this.layout().base; }
+
+  private scene(t: number, live: boolean) {
+    const { g, H } = this;
+    const { U, base } = this.layout();
     const P = (x: number, y: number): P2 => [base[0] + x * U, base[1] + y * U];
+    this.P = P; this.U = U;
 
     // ── the dark earth: a faint line of light where it begins, and the roots glowing in it ──
     const show = eo(t / 1.5);
@@ -229,9 +274,10 @@ export class Bloom {
       const pts: P2[] = [];
       for (let i = 0; i <= 32; i++) { const q = bez([0, 0], c1, c2, tip, i / 32); pts.push(P(q[0], q[1])); }
       const dim = h.depth === 0 ? 0.7 : 1;
-      this.line(pts, p, Math.max(2, U * 0.016), `rgba(10,34,52,${dim})`);
+      this.line(pts, p, Math.max(2, U * 0.016), `rgba(20,70,34,${dim})`);
+      this.line(pts, p, Math.max(1, U * 0.008), `rgba(70,150,60,${0.9 * dim})`);
       g.globalCompositeOperation = 'lighter';
-      this.line(pts, p, Math.max(1, U * 0.005), `rgba(80,160,230,${0.35 * dim})`);
+      this.line(pts, p, Math.max(1, U * 0.003), `rgba(140,230,200,${0.25 * dim})`);
       g.globalCompositeOperation = 'source-over';
       for (const lf of h.leaves) {
         if (p < lf.u) continue;
@@ -244,52 +290,62 @@ export class Bloom {
       if (p > 0.85) {
         const end = pts[32], pre = pts[29];
         const dir = Math.atan2(end[1] - pre[1], end[0] - pre[0]) + Math.PI / 2;
-        flowers.push(() => this.flower(h, end, dir + h.spin * (this.art.star ? 1 : 0.35), t, U));
+        flowers.push(() => this.flower(h, end, dir + h.spin * (h.art.star ? 1 : 0.35), t, U));
       }
     }
     for (const f of flowers) f();
 
-    // ── motes of light drifting up off the flowers ──
-    if (t > 8 && Math.random() < 0.5) {
+    if (!live) return;
+    this.spawnMotes(t);
+    this.drawMotes();
+  }
+
+  private P: (x: number, y: number) => P2 = (x, y) => [x, y];
+  private U = 1;
+  // ── motes of light drifting up off the flowers, and a few always hanging in the dark, like in her pictures ──
+  private spawnMotes(t: number) {
+    const { W, H, P, U } = this;
+    if (t > 8 && this.motes.length < 60 && Math.random() < 0.35) {
       const h = this.heads[Math.floor(Math.random() * this.heads.length)];
       if (t > h.t0 + h.dur + 0.5) {
         const [x, y] = P(h.tip[0], h.tip[1] - h.size * 0.3);
-        this.mote(x + (Math.random() - 0.5) * U * h.size * 0.8, y + (Math.random() - 0.5) * U * h.size * 0.4, (Math.random() - 0.5) * 12, -14 - Math.random() * 24, 3 + Math.random() * 2.5, 0.7 + Math.random() * 1.6);
+        this.mote(x + (Math.random() - 0.5) * U * h.size * 0.8, y + (Math.random() - 0.5) * U * h.size * 0.4, (Math.random() - 0.5) * 12, -14 - Math.random() * 24, 3 + Math.random() * 2.5, 0.7 + Math.random() * 1.4);
       }
     }
-    // and a few always hanging in the dark, like in her pictures
-    if (this.motes.length < 30 && Math.random() < 0.12) this.mote(Math.random() * W, H * (0.1 + Math.random() * 0.7), (Math.random() - 0.5) * 6, -4 - Math.random() * 6, 5 + Math.random() * 4, 0.6 + Math.random() * 1.4);
-    this.drawMotes();
-
-    const last = this.heads.reduce((m, h) => Math.max(m, h.t0 + h.dur), 0);
-    if (t > last + 3.6 && this.done) { this.done(); this.done = undefined; }
+    if (this.motes.length < 24 && Math.random() < 0.1) this.mote(Math.random() * W, H * (0.1 + Math.random() * 0.7), (Math.random() - 0.5) * 6, -4 - Math.random() * 6, 5 + Math.random() * 4, 0.6 + Math.random() * 1.2);
   }
 
   // ── a flower: the picture, opening wedge by wedge about where its petals grow from ──
   private flower(h: Head, at: P2, dir: number, t: number, U: number) {
-    const g = this.g, A = this.art;
+    const g = this.g, A = h.art;
     // the bud forms as the stem finishes, waits a moment, then opens slowly
-    const main = h === this.heads.find((x) => x.depth === 1);
-    const bloomStart = h.t0 + h.dur + (main ? 0.9 : 0.5);
-    const open = clamp((t - bloomStart) / (main ? 3.4 : 2.8));
+    const bloomStart = h.t0 + h.dur + (h.main ? 0.9 : 0.5);
+    const open = clamp((t - bloomStart) / (h.main ? 3.4 : 2.8));
     const grow = eo((t - h.t0 - h.dur * 0.8) / 1.4);
     if (grow <= 0.01) return;
     if (open > 0.4) this.cue(`b${h.seed}`, 'bloom');
-    const k = ((h.size * U) / A.w) * (0.55 + 0.45 * grow) * (1 + Math.sin(t * 1.3 + h.seed) * 0.01 * open);
+    const big = Math.max(A.w, A.h);
+    const k = ((h.size * U) / big) * (0.55 + 0.45 * grow) * (1 + Math.sin(t * 1.3 + h.seed) * 0.01 * open);
     const px = A.pivot[0] * A.w, py = A.pivot[1] * A.h;
-    // a halo behind it
-    const cx = at[0] + Math.sin(dir) * (A.pivot[1] - A.core[1]) * A.h * k, cy = at[1] - Math.cos(dir) * (A.pivot[1] - A.core[1]) * A.h * k;
-    this.glow(cx, cy, A.w * k * (0.5 + 0.3 * open), (A.star ? 0.08 : 0.12 + 0.12 * open) * grow);
-    if (h.depth === 0 && 'filter' in g) g.filter = 'brightness(0.72)';
+    // a halo of its own colour behind it (centred on the flower, above where it joins the stem)
+    const up = (A.star ? 0 : py - A.h * 0.45) * k;
+    const cx = at[0] + Math.sin(dir) * up, cy = at[1] - Math.cos(dir) * up;
+    const halo = big * k * (0.55 + 0.3 * open), ha = (0.16 + 0.14 * open) * grow * (h.depth === 0 ? 0.6 : 1);
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = ha;
+    g.drawImage(A.glow, cx - halo, cy - halo, halo * 2, halo * 2);
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
+    const img = h.depth === 0 ? A.dim : A.img;
     if (open >= 1) {
       g.save();
       g.translate(at[0], at[1]); g.rotate(dir); g.scale(k, k);
-      g.drawImage(A.img, -px, -py);
+      g.drawImage(img, -px, -py);
       g.restore();
     } else {
       // folded: every wedge turned towards the top; opening, the outer ones last
-      const N = 40, closedK = A.star ? 0.08 : 0.1, r0 = A.star ? 0.5 : 0.6, R = Math.hypot(A.w, A.h) * 1.2, eps = (TAU / N) * 0.12;
-      const order = Array.from({ length: N }, (_, i) => i).sort((a, b) => Math.abs(this.phi(a, N)) - Math.abs(this.phi(b, N)));
+      const N = 30, closedK = A.star ? 0.08 : 0.1, r0 = A.star ? 0.5 : 0.6, R = Math.hypot(A.w, A.h) * 1.2, eps = (TAU / N) * 0.12;
+      const order = WEDGES[N] ??= Array.from({ length: N }, (_, i) => i).sort((a, b) => Math.abs(this.phi(a, N)) - Math.abs(this.phi(b, N)));
       for (const i of order) {
         const phi = this.phi(i, N);
         const delay = (Math.abs(phi) / Math.PI) * (A.star ? 0.25 : 0.45);
@@ -304,14 +360,10 @@ export class Bloom {
         g.scale(k * rs, k * rs);
         g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a0) * R, Math.sin(a0) * R); g.lineTo(Math.cos(a1) * R, Math.sin(a1) * R); g.closePath();
         g.clip();
-        g.drawImage(A.img, -px, -py);
+        g.drawImage(img, -px, -py);
         g.restore();
       }
     }
-    if ('filter' in g) g.filter = 'none';
-    // its heart glows brighter as it opens
-    // (the lily's heart isn't lit in her picture: only a breath of light there)
-    this.glow(cx, cy, A.w * k * 0.16, (A.star ? 0.06 : 0.25 + 0.35 * open) * grow * (0.85 + 0.15 * Math.sin(t * 2 + h.seed)));
   }
   private phi(i: number, N: number) { return -Math.PI + ((i + 0.5) / N) * TAU; }
 
@@ -348,15 +400,15 @@ export class Bloom {
     path.bezierCurveTo(L * 0.3, -w * (1.2 + bend * 0.3), L * 0.75, -w * (0.9 + bend * 0.3), L, bend * w * 0.4);
     path.bezierCurveTo(L * 0.72, w * (0.9 - bend * 0.3), L * 0.3, w * (1.0 - bend * 0.3), 0, 0);
     const gr = g.createLinearGradient(0, -w, 0, w);
-    gr.addColorStop(0, `rgba(30,90,140,${0.9 * dim})`); gr.addColorStop(0.5, `rgba(12,50,84,${0.92 * dim})`); gr.addColorStop(1, `rgba(6,24,44,${0.95 * dim})`);
+    gr.addColorStop(0, `rgba(40,150,90,${0.92 * dim})`); gr.addColorStop(0.5, `rgba(16,92,52,${0.94 * dim})`); gr.addColorStop(1, `rgba(6,48,30,${0.96 * dim})`);
     g.fillStyle = gr; g.fill(path);
-    g.strokeStyle = `rgba(110,190,255,${0.45 * dim})`; g.lineWidth = Math.max(0.6, L * 0.012); g.stroke(path);
-    g.strokeStyle = `rgba(130,200,255,${0.3 * dim})`;
+    g.strokeStyle = `rgba(120,240,215,${0.5 * dim})`; g.lineWidth = Math.max(0.6, L * 0.012); g.stroke(path);
+    g.strokeStyle = `rgba(150,240,200,${0.3 * dim})`;
     g.beginPath(); g.moveTo(L * 0.05, 0); g.quadraticCurveTo(L * 0.5, -w * 0.15 + bend * w * 0.1, L * 0.92, bend * w * 0.35); g.stroke();
     g.restore();
   }
   private mote(x: number, y: number, vx: number, vy: number, life: number, r: number) {
-    if (this.motes.length > 200) return;
+    if (this.motes.length > 90) return;
     this.motes.push({ x, y, vx, vy, life, age: 0, r, tw: Math.random() * 6 });
   }
   private drawMotes() {
@@ -366,7 +418,7 @@ export class Bloom {
       m.age += dt; m.x += m.vx * dt; m.y += m.vy * dt; m.vx *= 0.985; m.vy = m.vy * 0.99 - 2 * dt;
       const a = Math.sin(Math.PI * clamp(m.age / m.life)) * (0.7 + 0.3 * Math.sin(m.age * 5 + m.tw));
       g.globalAlpha = a * 0.85;
-      g.drawImage(this.glowSprite, m.x - m.r * 5, m.y - m.r * 5, m.r * 10, m.r * 10);
+      g.drawImage(this.glowSprite, m.x - m.r * 3.5, m.y - m.r * 3.5, m.r * 7, m.r * 7);
       g.fillStyle = `rgb(${BLUE[0] + 120},${BLUE[1] + 70},255)`;
       g.fillRect(m.x - m.r * 0.5, m.y - m.r * 0.5, m.r, m.r);
     }

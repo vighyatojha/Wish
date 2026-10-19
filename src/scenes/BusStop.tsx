@@ -32,7 +32,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { content } from '../content';
 import { gsap, useGSAP, ease } from '../lib/motion';
-import { buzz, prefersReducedMotion } from '../lib/device';
+import { buzz, prefersReducedMotion, isTouch } from '../lib/device';
 import {
   createRainSound, createWindSound, createCrickets, playWhoosh, playSnap, playAirRelease, playDoor, playStep,
   playShimmer, playChime, playPop, playMusicBox, isMuted, setMuted, onMute, type LiveSound,
@@ -218,6 +218,8 @@ export function BusStop({ flying, entered }: Props) {
   const clockText = useRef<HTMLSpanElement>(null);
   const clockIcon = useRef<SVGGElement>(null);
   const finaleEl = useRef<HTMLDivElement>(null);
+  const flyingRef = useRef(flying);
+  flyingRef.current = flying;
   const answerRef = useRef<FlowerKind>('Tulip');
   const bouquetCanvas = useRef<HTMLCanvasElement>(null);
   const bouquetVeil = useRef<HTMLDivElement>(null);
@@ -241,6 +243,7 @@ export function BusStop({ flying, entered }: Props) {
     garden: 0, birds: 0,                                               // (how much the story has let in; the clock does the rest)
     hour: DAY_START, clock: false,                                     // the day's clock, and whether it's running
     glow: 0,                                                           // the end: the lights glow a little brighter
+    blackout: false,                                                   // her flower has the (black) screen to itself
     banner: false, row0: 0, row1: 0, row2: 0, away: 0,                // the fairies' bunting
   }).current;
   const actors = useRef<Actor[]>(CARDS.map(() => ({
@@ -319,7 +322,7 @@ export function BusStop({ flying, entered }: Props) {
       if (cancelled) return;
       pics.current = p;
       still.current!.src = p.empty;
-      const s = await Stage.create(stageCanvas.current!, { ...p, width: PIC_W, height: PIC_H }, film.current!);
+      const s = await Stage.create(stageCanvas.current!, { ...p, width: PIC_W, height: PIC_H }, film.current!, QUALITY[0]);
       if (cancelled) return s?.destroy();
       if (!s) return useStill('');
       stage = s;
@@ -337,16 +340,18 @@ export function BusStop({ flying, entered }: Props) {
     });
 
     // if the device is struggling, draw at a lower resolution until it keeps up
-    const QUALITY = [1.5, 1.1, 0.8, 0.6];
+    // (phones start a step lower: their screens are dense, and the painting is soft anyway)
+    const QUALITY = isTouch ? [1.25, 1.0, 0.8, 0.6] : [1.5, 1.1, 0.8, 0.6];
     let quality = 0, slowFrames = 0, slowTime = 0;
     const adapt = (rawDt: number) => {
-      if (rawDt > 1 / 24) { slowFrames++; slowTime += rawDt; } else slowFrames = Math.max(0, slowFrames - 1);
-      if (slowFrames > 30 && slowTime > 1.5 && quality < QUALITY.length - 1) {
+      // slower than ~40 frames a second for a while: draw a little coarser, until it keeps up
+      if (rawDt > 1 / 40) { slowFrames++; slowTime += rawDt; } else slowFrames = Math.max(0, slowFrames - 1);
+      if (slowFrames > 40 && slowTime > 1.2 && quality < QUALITY.length - 1) {
         quality++;
         slowFrames = 0;
         slowTime = 0;
         stage?.setMaxDpr(QUALITY[quality]);
-        life.maxDpr = Math.min(1.75, QUALITY[quality]);
+        life.maxDpr = Math.min(isTouch ? 1.5 : 1.75, QUALITY[quality]);
         life.resize(W, H);
       }
     };
@@ -365,6 +370,7 @@ export function BusStop({ flying, entered }: Props) {
         `fps: ${fps.toFixed(0)}  quality: ${QUALITY[quality]}  size: ${W}×${H} @${window.devicePixelRatio}`,
         `clock: ${formatHour(S.hour)} (${S.clock ? 'running' : 'waiting'} ×${SPEED})  butterflies ${(S.garden * dayLook(S.hour).butterflies).toFixed(2)} fireflies ${dayLook(S.hour).fireflies.toFixed(2)}`,
         `story: night ${S.night.toFixed(2)} rain ${S.rain.toFixed(2)} haze ${S.haze.toFixed(2)} weights ${S.weights.map((x) => x.toFixed(2)).join('/')}`,
+        `ms/frame: ${Object.entries(perf).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(' · ')}`,
         `film: ready ${v.readyState} t ${v.currentTime.toFixed(1)} frame ${stage?.videoHasFrame ?? false}`,
       ].join('\n');
     };
@@ -372,11 +378,30 @@ export function BusStop({ flying, entered }: Props) {
 
     let last = 0;
     let lastMinute = -1;
+    // (?debug: how long each part of a frame takes, in ms, smoothed)
+    const perf: Record<string, number> = {};
+    let pt = 0;
+    const mark = (name: string) => { const n = performance.now(); perf[name] = (perf[name] ?? 0) * 0.94 + (n - pt) * 0.06; pt = n; };
+    if (showDebug) (window as unknown as { __perf: typeof perf }).__perf = perf;
+    let idleFrames = 0;
+    let rainIdle = 0, rainHidden = false;
+    let buntingShown = true, frontShown = true;
     const frame = (now: number) => {
       const rawDt = last ? (now - last) / 1000 : 0.016;
       const dt = Math.min(0.05, rawDt);
       last = now;
       const time = now / 1000;
+      raf = requestAnimationFrame(frame);
+      // Nothing of this scene is on screen while page 1 is still up (it only waits underneath),
+      // or once her flower has the screen to itself: don't spend the phone's time drawing it.
+      if (!flyingRef.current || S.blackout) {
+        // (only the background's first-frame check, now and then, so it's ready the moment it's needed)
+        if (stage && !stage.ready && ++idleFrames % 15 === 0) stage.render({ time, layout: base, zoom: 1, zoomCenter: [0.5, 0.5], blur: 0, weights: S.weights, rain: S.rain, night: 0, door: 0, wind: 0, cloud: 0, lamp: 0, morn: 1, dawn: 1, mist: 0, noon: 0 });
+        if (stage && stage.ready && !stageShown) { stageShown = true; stageCanvas.current!.style.opacity = '1'; announce(); }
+        last = 0;
+        return;
+      }
+      pt = performance.now();
       if (rawDt < 1) adapt(rawDt);
 
       // ── the day's clock (real time: it doesn't wait for anything; paused while the tab is hidden) ──
@@ -504,6 +529,7 @@ export function BusStop({ flying, entered }: Props) {
         });
       });
 
+      mark('scene');
       // ── the background ──
       let focus: { x: number; y: number; sharp: number; soft: number } | undefined;
       if (S.focus > 0.001) focus = { x: headScreen[0], y: headScreen[1] - 0.03, sharp: 0.16, soft: 0.5 };
@@ -521,6 +547,8 @@ export function BusStop({ flying, entered }: Props) {
         if (stage.ready && !stageShown) {
           stageShown = true;
           stageCanvas.current!.style.opacity = '1';
+          // (the still picture underneath can't be seen now: take it off the screen)
+          setTimeout(() => { if (still.current && !stillMode) still.current.style.visibility = 'hidden'; }, 800);
           announce();
         }
       } else if (stillMode && still.current && pics.current) {
@@ -538,6 +566,7 @@ export function BusStop({ flying, entered }: Props) {
         s.style.filter = `brightness(${(1 - S.rain * 0.3 - S.night * 0.17 - look.dawn * 0.3).toFixed(2)}) saturate(${(1 - S.rain * 0.4).toFixed(2)}) blur(${(S.blur * 2).toFixed(1)}px)`;
       }
 
+      mark('stage');
       // ── life, rain, fog ──
       life.amount.garden = S.garden * look.butterflies;
       life.amount.birds = S.birds * look.birds;
@@ -545,6 +574,10 @@ export function BusStop({ flying, entered }: Props) {
       life.light = { tint: light.tint, sun: norm(look.sun), sunlight: look.sunlight * (1 - S.rain) };
       { const half = base.span[0] / (2 * z), mid = layout.offset[0] + base.span[0] / 2; life.view = [mid - half, mid + half]; }
       life.frame(time, dt, map, ppp);
+      // (the front layer is only on screen while something is drawn on it)
+      if (life.frontUsed !== frontShown) { frontShown = life.frontUsed; frontCanvas.current!.style.visibility = frontShown ? 'visible' : 'hidden'; }
+      if (S.banner !== buntingShown) { buntingShown = S.banner; buntingCanvas.current!.style.visibility = buntingShown ? 'visible' : 'hidden'; }
+      mark('life');
 
       // ── sounds of the hour: birds in the morning, crickets in the evening ──
       if (sounds.birdsong) sounds.birdsong.volume = clamp(look.birdsong * 0.55 * fades.birdsong);
@@ -553,16 +586,22 @@ export function BusStop({ flying, entered }: Props) {
         if (S.away < 1) { banner.update(time, dt, [S.row0, S.row1, S.row2], S.away); bannerHidden = false; }
         else if (!bannerHidden) { banner.hideAll(); bannerHidden = true; S.banner = false; }
       }
-      rain.update(dt, S.rainFall, false);
-      rain.draw(0);
+      mark('bunting');
+      // (once the rain has stopped and the last drops have fallen, its layer goes)
+      if (S.rainFall > 0.001) rainIdle = 0; else rainIdle += dt;
+      if (rainIdle < 3) {
+        rain.update(dt, S.rainFall, false);
+        rain.draw(0);
+        if (rainHidden) { rainCanvas.current!.style.display = ''; rainHidden = false; }
+      } else if (!rainHidden) { rainCanvas.current!.style.display = 'none'; rainHidden = true; }
+      mark('rain');
       sounds.rain?.setLevel(S.rainFall * 0.75);
       if (S.fogGone && fogCanvas.current && fogCanvas.current.style.display !== 'none') fogCanvas.current.style.display = 'none';
       if (fog && !S.fogGone) {
         fog.render({ time, travel: S.travel, haze: S.haze, light: S.light, mist: 0, sun: [0.55, 0.16], focus: [0.5, 0.48] });
       }
       if (vignette.current) vignette.current.style.opacity = S.vignette.toFixed(3);
-
-      raf = requestAnimationFrame(frame);
+      mark('fog');
     };
     raf = requestAnimationFrame(frame);
 
@@ -614,7 +653,7 @@ export function BusStop({ flying, entered }: Props) {
       // and (if it takes more than a moment) a loading card appears in it
       gsap.to(S, { light: 0.5, duration: 3, ease: ease.scenery });
       gsap.to(S, { travel: 1.2, duration: 40, ease: 'sine.out' });
-      const id = window.setTimeout(() => setLoading('scene'), 700);
+      const id = window.setTimeout(() => setLoading((l) => l ?? 'scene'), 700);
       return () => clearTimeout(id);
     }
     setLoading(null);
@@ -1101,6 +1140,7 @@ export function BusStop({ flying, entered }: Props) {
     gsap.to('.stop__clock', { autoAlpha: 0, duration: 1.2 });
     await play(gsap.to(bouquetVeil.current, { opacity: 1, duration: 2, ease: 'sine.inOut' }));
     setUi((u) => ({ ...u, finale: false }));
+    S.blackout = true; // (the scene underneath stops drawing: it can't be seen)
     await wait(0.6);
     const canvas = bouquetCanvas.current!;
     canvas.style.visibility = 'visible';
@@ -1121,7 +1161,7 @@ export function BusStop({ flying, entered }: Props) {
     gc.style.visibility = 'visible';
     await document.fonts.load('700 100px "Playfair Display"').catch(() => {});
     // (in the flowers' blue: blue roses, deep teal stems, white letters)
-    const tg = new TypeGarden(gc, { palette: ['night', 'transparent', '#3f86ff', '#2a7fa8', '#cfe6ff', '#f2f7ff', '#04101c'], transparent: true, interactive: false, caret: true, scale: 0.3, density: 0.7, legible: true, maxDpr: 2, font: '"Playfair Display",Georgia,serif' });
+    const tg = new TypeGarden(gc, { palette: ['night', 'transparent', '#3f86ff', '#2a7fa8', '#cfe6ff', '#f2f7ff', '#04101c'], transparent: true, interactive: false, caret: true, scale: 0.3, density: 0.7, legible: true, maxDpr: isTouch ? 1.5 : 2, font: '"Playfair Display",Georgia,serif' });
     gardenRef.current = tg;
     tg.start();
     for (const ch of content.finale.gardenWords) { tg.type(ch); await wait(ch === ' ' ? 0.32 : 0.2); }
@@ -1211,7 +1251,7 @@ export function BusStop({ flying, entered }: Props) {
       <div ref={flash} className="layer stop__flash" />
 
       {/* while the pictures (or the bus film) are still arriving */}
-      {loading && (
+      {loading && !(loading === 'scene' && pictureReady) && (
         <div className={`stop__loading stop__loading--${loading}`} role="status" aria-live="polite">
           <svg className="stop__loadfly" viewBox="-30 -24 60 48" aria-hidden="true">
             <g className="stop__loadwing stop__loadwing--l"><path d="M-2,-2 C-14,-22 -30,-18 -26,-4 C-24,4 -12,6 -2,2Z" /><path d="M-2,2 C-12,6 -22,16 -14,20 C-8,22 -3,12 -1,4Z" /></g>

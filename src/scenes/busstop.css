@@ -413,3 +413,16 @@
 @media (min-aspect-ratio: 1/1) {
   .stop__garden { top: calc(1svh + env(safe-area-inset-top)); height: 26svh; }
 }
+
+/* a phone held sideways: short, so the finale and the question are set tighter */
+@media (orientation: landscape) and (max-height: 520px) {
+  .stop__finale { width: min(70vw, 34rem); }
+  .stop__finale-hb { font-size: clamp(1.7rem, 9svh, 2.4rem); }
+  .stop__finale-name { font-size: clamp(2.1rem, 12svh, 3rem); }
+  .stop__finale-msg { max-width: 46ch; margin-top: 0.5rem; font-size: 0.95rem; line-height: 1.35; }
+  .stop__count { margin-top: 0.6rem; }
+  .stop__question { top: 14svh; padding: 0.8rem 1rem; width: min(46vw, 22rem); }
+  .stop__ask { margin: 0.15rem 0 0.6rem !important; font-size: 1.35rem; }
+  .stop__option svg { width: 30px; height: 40px; }
+  .stop__garden { height: 24svh; }
+}
