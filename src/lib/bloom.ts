@@ -58,6 +58,13 @@ const BUNCH: Record<FlowerKind, Variant[]> = {
   ],
 };
 
+/** more colours, only for the field of flowers that spreads out afterwards */
+const EXTRA: Record<FlowerKind, Variant[]> = {
+  Tulip: [],
+  Lily: [V('lily-small-red', [0.445, 0.963], [214, 50, 36]), V('lily-small-burgundy', [0.425, 0.95], [150, 40, 80])],
+  Lotus: [],
+};
+
 /** a flower picture, ready to draw: itself, a dimmer copy (for the ones further back), and its glow */
 interface Art { img: CanvasImageSource; dim: CanvasImageSource; glow: HTMLCanvasElement; w: number; h: number; pivot: P2; star: boolean }
 
@@ -113,8 +120,8 @@ export function preloadFlowers(): void {
   (Object.keys(BUNCH) as FlowerKind[]).forEach((k) => void loadArt(BUNCH[k][0]));
 }
 
-interface Root { pts: P2[]; t0: number; dur: number; w: number }
-interface Head { vi: number; star: boolean; waited: number; art?: Art; main: boolean; tip: P2; bow: number; t0: number; dur: number; size: number; spin: number; depth: number; seed: number; leaves: { u: number; side: number; L: number }[] }
+interface Root { pts: P2[]; t0: number; dur: number; w: number; field?: boolean }
+interface Head { vi: number; star: boolean; waited: number; art?: Art; main: boolean; root: number; field: boolean; thin: number; tip: P2; bow: number; t0: number; dur: number; size: number; spin: number; depth: number; seed: number; leaves: { u: number; side: number; L: number }[] }
 interface Mote { x: number; y: number; vx: number; vy: number; life: number; age: number; r: number; tw: number }
 
 const BLUE = [110, 180, 255] as const;
@@ -131,7 +138,7 @@ export class Bloom {
   private done?: () => void;
   private cued = new Set<string>();
   /** moments worth a sound: 'land' (the seed) and 'bloom' (each flower opening) */
-  onCue: (cue: 'land' | 'bloom') => void = () => {};
+  onCue: (cue: 'land' | 'bloom' | 'spread') => void = () => {};
 
   /** shown softly under the roots only if a picture is still downloading when its flower should open */
   waitingText = '';
@@ -146,7 +153,7 @@ export class Bloom {
   constructor(private canvas: HTMLCanvasElement, private kind: FlowerKind) {
     this.g = canvas.getContext('2d')!;
     this.glowSprite = glowSprite([110, 180, 255]);
-    this.variants = BUNCH[kind];
+    this.variants = [...BUNCH[kind], ...EXTRA[kind]];
     this.arts = this.variants.map(() => undefined);
     this.variants.forEach((v, i) => void loadArt(v).then((a) => { this.arts[i] = a; }));
     this.plan();
@@ -157,7 +164,7 @@ export class Bloom {
     if (h.art) return h.art; // (once chosen it stays: no swapping pictures mid-bloom)
     const own = this.arts[h.vi];
     if (own) return (h.art = own);
-    if (own === null || h.waited > (h.main ? 20 : 8)) h.art = this.arts.find((a): a is Art => !!a);
+    if (own === null || h.field || h.waited > (h.main ? 20 : 8)) h.art = this.arts.find((a): a is Art => !!a);
     return h.art;
   }
   /** a flower that should be showing by now but has no picture yet (and might still get one) */
@@ -183,10 +190,10 @@ export class Bloom {
     // a bunch: the first one in the middle, then the others around it, each its own colour;
     // depth 0 = behind (a little dimmer), 2 = in front
     const H = (vi: number, main: boolean, tip: P2, bow: number, t0: number, dur: number, size: number, spin: number, depth: number): Head => ({
-      vi, star: !!this.variants[vi].star, waited: 0, main, tip, bow, t0, dur, size, spin, depth, seed: r() * 100,
+      vi, star: !!this.variants[vi].star, waited: 0, main, root: 0, field: false, thin: 1, tip, bow, t0, dur, size, spin, depth, seed: r() * 100,
       leaves: [{ u: 0.28 + r() * 0.1, side: r() < 0.5 ? -1 : 1, L: 0.17 + r() * 0.06 }, { u: 0.5 + r() * 0.1, side: 0, L: 0.13 + r() * 0.05 }],
     });
-    const n = this.variants.length;
+    const n = BUNCH[this.kind].length;
     // (size: the picture's larger side, as a share of the main stem's length; tulips are cups, so a little smaller)
     const s0 = this.kind === 'Tulip' ? 0.46 : 0.74;
     this.heads.push(H(0, true, [0.0, -1.0], 0.03, 4.6, 3.3, s0, 0, 1));
@@ -198,13 +205,107 @@ export class Bloom {
       this.heads.push(H(vi, false, [x, y], x * 0.12, 9.3 + i * 0.7, 2.6, s0 * s * (star ? 0.85 : 1), star ? spin * 2.4 : spin, depth));
     });
     this.heads.sort((a, b) => a.depth - b.depth);
+    this.bunchEnd = this.heads.reduce((m, h) => Math.max(m, h.t0 + h.dur), 0);
+  }
+
+  // ── then the roots run out under the ground to both edges of the screen, and all along them more
+  //    of her flowers come up, in all their colours: a whole field of them (it depends on the screen's shape) ──
+  private bunchEnd = 0;
+  private spreadAt = 12.2;
+  private spreadDur = 1;
+  private reach = 1;
+  private planField() {
+    this.heads = this.heads.filter((h) => !h.field);
+    this.roots = this.roots.filter((rt) => !rt.field);
+    const r = rng(777);
+    const { W, U } = { W: this.W, U: this.layout().U };
+    const reach = (this.reach = Math.max(0.75, W / 2 / U - 0.08));
+    const t0 = this.spreadAt, dur = (this.spreadDur = 2.4 + reach * 1.7);
+    const at = (x: number) => t0 + dur * (Math.abs(x) / reach); // when the running root gets there
+    const s0 = this.kind === 'Tulip' ? 0.46 : 0.74;
+    const nv = this.variants.length;
+    let lastV = 0;
+    const pick = () => { let v = Math.floor(r() * nv); if (v === lastV) v = (v + 1) % nv; return (lastV = v); };
+    // the two running roots, just under the ground, wandering a little
+    for (const side of [-1, 1]) {
+      const pts: P2[] = [], m = 28;
+      const ph = r() * 6;
+      for (let i = 0; i <= m; i++) {
+        const u = i / m;
+        pts.push([side * reach * u, 0.03 + u * 0.035 + Math.sin(u * 11 + ph) * 0.014 + Math.sin(u * 29 + ph) * 0.005]);
+      }
+      this.roots.push({ pts, t0, dur, w: 0.0055, field: true });
+      // fine rootlets hanging off it as it goes, like the hairs on a real root
+      for (let i = 2; i < m; i++) {
+        if (r() < 0.45) continue;
+        const [x0, y0] = pts[i], q: P2[] = [[x0, y0]];
+        let a = Math.PI / 2 + (r() - 0.5) * 1.2, x = x0, y = y0;
+        const len = 0.03 + r() * 0.06;
+        for (let k = 1; k <= 4; k++) { a += (r() - 0.5) * 0.7; x += Math.cos(a) * len / 4; y += Math.sin(a) * len / 4; q.push([x, y]); }
+        this.roots.push({ pts: q, t0: t0 + dur * (i / m), dur: 0.7, w: 0.0028, field: true });
+      }
+    }
+    // a little tuft of roots under each new plant
+    const tuft = (x: number, t: number) => {
+      for (const a of [Math.PI / 2 - 0.5, Math.PI / 2 + 0.5, Math.PI / 2]) {
+        const pts: P2[] = [[x, 0.03]], len = 0.08 + r() * 0.07;
+        let px = x, py = 0.03, aa = a;
+        for (let i = 1; i <= 5; i++) { aa += (r() - 0.5) * 0.6; px += Math.cos(aa) * len / 5; py += Math.sin(aa) * len / 5; pts.push([px, py]); }
+        this.roots.push({ pts, t0: t, dur: 0.9, w: 0.0035, field: true });
+      }
+    };
+    const plant = (x: number, back: boolean) => {
+      const d = Math.abs(x) / reach, sgn = Math.sign(x) || 1;
+      const t = at(x) + 0.15;
+      if (!back) tuft(x, t - 0.1);
+      // nearer the edges a little shorter; the back row taller and dimmer, peeping over
+      const h = (back ? 0.8 : 0.6) - 0.2 * d + (r() - 0.5) * 0.16;
+      const size = s0 * (back ? 0.46 : 0.58) * (1 - 0.18 * d);
+      const vi = pick();
+      const star = !!this.variants[vi].star;
+      const head: Head = {
+        vi, star, waited: 0, main: false, root: x, field: true, thin: back ? 0.55 : 0.7,
+        tip: [sgn * (0.03 + r() * 0.05), -h], bow: sgn * 0.04 * (r() - 0.3), t0: t + (back ? 0.35 : 0), dur: 1.6 + h * 0.9,
+        size: size * (star ? 0.85 : 1), spin: sgn * (0.1 + r() * 0.12) * (star ? 2 : 1), depth: back ? 0 : 2, seed: r() * 100,
+        leaves: [{ u: 0.3 + r() * 0.1, side: r() < 0.5 ? -1 : 1, L: (0.1 + r() * 0.05) * (0.5 + h) }, { u: 0.52 + r() * 0.1, side: 0, L: (0.08 + r() * 0.04) * (0.5 + h) }],
+      };
+      this.heads.push(head);
+      // now and then a second, smaller flower branching off the same stem
+      if (!back && r() < 0.4) {
+        const v2 = pick();
+        this.heads.push({ ...head, vi: v2, star: !!this.variants[v2].star, art: undefined, tip: [sgn * (0.13 + r() * 0.05), -h * 0.68], bow: sgn * 0.06, t0: head.t0 + 0.5, dur: head.dur * 0.8, size: head.size * 0.72, seed: r() * 100, depth: 1, leaves: [head.leaves[0]] });
+      }
+    };
+    if (reach < 1.25) {
+      for (const [x, hh] of [[0.36, 1.12], [0.66, 0.98], [-0.38, 1.1], [-0.64, 0.96]] as const) {
+        const vi = pick(), star = !!this.variants[vi].star, sgn = Math.sign(x);
+        this.heads.push({
+          vi, star, waited: 0, main: false, root: x * 0.5, field: true, thin: 0.5,
+          tip: [x * 0.5 + sgn * 0.05, -hh], bow: sgn * 0.03, t0: t0 + 0.6 + r() * 1.6, dur: 2.2,
+          size: s0 * 0.42 * (star ? 0.85 : 1), spin: sgn * 0.15, depth: 0, seed: r() * 100,
+          leaves: [{ u: 0.4 + r() * 0.1, side: sgn, L: 0.12 }],
+        });
+      }
+    }
+    const step = 0.27, start = Math.min(0.74, reach - 0.08);
+    for (let x = start; x <= reach - 0.06; x += step) {
+      for (const sgn of [-1, 1]) {
+        const jx = (r() - 0.5) * 0.06;
+        plant(sgn * (x + jx), false);
+        if (x + step / 2 <= reach - 0.06) plant(sgn * (x + step / 2 + jx), true);
+      }
+    }
+    this.heads.sort((a, b) => a.depth - b.depth);
   }
 
   resize(W: number, H: number) {
     this.W = W; this.H = H;
+    this.planField();
     // (phones: their screens are dense; 1.5× is plenty for soft, glowing flowers)
     this.dpr = Math.min(window.devicePixelRatio || 1, window.matchMedia?.('(pointer: coarse)').matches ? 1.5 : 2);
     this.snap = null;
+    this.rootCache = this.backCache = this.frontCache = null;
+    this.baked.clear();
     this.canvas.width = Math.round(W * this.dpr);
     this.canvas.height = Math.round(H * this.dpr);
   }
@@ -226,7 +327,7 @@ export class Bloom {
     return new Promise((res) => { this.done = res; });
   }
   destroy() { cancelAnimationFrame(this.raf); }
-  private cue(name: string, c: 'land' | 'bloom') { if (!this.cued.has(name)) { this.cued.add(name); this.onCue(c); } }
+  private cue(name: string, c: 'land' | 'bloom' | 'spread') { if (!this.cued.has(name)) { this.cued.add(name); this.onCue(c); } }
 
   /** the finished bunch, drawn once (it hardly changes after that: it sways a little, and the motes move) */
   private snap: HTMLCanvasElement | null = null;
@@ -264,7 +365,7 @@ export class Bloom {
       return;
     }
     this.scene(t, true, held);
-    if (t > last + 3.6 && this.done) { this.done(); this.done = undefined; }
+    if (t > this.bunchEnd + 3.6 && this.done) { this.done(); this.done = undefined; }
   }
 
   /** while a picture is still downloading: its bud glows softly at the top of its stem, and a quiet line says so */
@@ -300,16 +401,17 @@ export class Bloom {
     // ── the dark earth: a faint line of light where it begins, and the roots glowing in it ──
     const show = eo(t / 1.5);
     g.globalCompositeOperation = 'lighter';
-    const sl = g.createLinearGradient(base[0] - U, 0, base[0] + U, 0);
+    const spread = eio((t - this.spreadAt) / this.spreadDur);
+    const half = U * (1 + Math.max(0, this.reach + 0.1 - 1) * spread);
+    const sl = g.createLinearGradient(base[0] - half, 0, base[0] + half, 0);
     sl.addColorStop(0, 'rgba(90,150,255,0)'); sl.addColorStop(0.5, `rgba(90,150,255,${0.2 * show})`); sl.addColorStop(1, 'rgba(90,150,255,0)');
-    g.fillStyle = sl; g.fillRect(base[0] - U, base[1] - 1, U * 2, 2);
-    for (const rt of this.roots) {
-      const p = clamp((t - rt.t0) / rt.dur);
-      if (p <= 0) continue;
-      const pts = rt.pts.map(([x, y]) => P(x, y));
-      this.line(pts, p, rt.w * U * 3, 'rgba(70,140,255,0.13)');
-      this.line(pts, p, Math.max(0.8, rt.w * U), 'rgba(170,215,255,0.8)');
-    }
+    g.fillStyle = sl; g.fillRect(base[0] - half, base[1] - 1, half * 2, 2);
+    if (t > this.spreadAt) this.cue('spread', 'spread');
+    // (once every root has finished growing they're drawn once, into a picture, and that's reused)
+    const rootsDone = this.roots.reduce((m, rt) => Math.max(m, rt.t0 + rt.dur), 0);
+    if (t > rootsDone && !this.rootCache) this.rootCache = this.offscreen(() => this.drawRoots(t, P, U));
+    if (this.rootCache) { g.globalCompositeOperation = 'lighter'; g.drawImage(this.rootCache, 0, 0, this.W, H); }
+    else this.drawRoots(t, P, U);
     g.globalCompositeOperation = 'source-over';
 
     // ── the seed: a blue mote of light falling into the dark ──
@@ -330,19 +432,69 @@ export class Bloom {
     if (sprout > 0.01) for (const side of [-1, 1]) this.leaf(P(0, -0.07 * clamp((t - 3.6) / 0.8)), -Math.PI / 2 + side * 1.05, U * 0.07 * sprout, side * 0.4);
 
     // ── stems and leaves (all), then the flowers back to front ──
+    // (a flower of the field that has fully opened stays still: it's drawn once into a picture, behind or in
+    //  front of the bunch, so a screen full of flowers costs no more to draw than a few)
+    for (const h of this.heads) {
+      if (!h.field || this.baked.has(h) || !h.art || t < h.t0 + h.dur + 0.5 + 2.8 + 0.6) continue;
+      this.baked.add(h);
+      const into = h.depth === 0 ? (this.backCache ??= this.offscreen(() => {})) : (this.frontCache ??= this.offscreen(() => {}));
+      this.offscreen(() => { const f = this.stem(h, t, U, P); f?.(); }, into);
+    }
+    if (this.backCache) g.drawImage(this.backCache, 0, 0, this.W, H);
     const flowers: (() => void)[] = [];
     for (const h of this.heads) {
-      const p = eio((t - h.t0) / h.dur);
+      if (this.baked.has(h)) continue;
+      const f = this.stem(h, t, U, P, h === held ? (tp) => { heldTip = tp; } : undefined);
+      if (f) flowers.push(f);
+    }
+    for (const f of flowers) f();
+    if (this.frontCache) g.drawImage(this.frontCache, 0, 0, this.W, H);
+
+    if (!live) return;
+    this.drawWaiting(held, heldTip);
+    this.spawnMotes(t);
+    this.drawMotes();
+  }
+
+  private rootCache: HTMLCanvasElement | null = null;
+  private backCache: HTMLCanvasElement | null = null;
+  private frontCache: HTMLCanvasElement | null = null;
+  private baked = new Set<Head>();
+  /** draws into another canvas (a new one the size of this one, or the one given) */
+  private offscreen(draw: () => void, c?: HTMLCanvasElement): HTMLCanvasElement {
+    if (!c) { c = document.createElement('canvas'); c.width = this.canvas.width; c.height = this.canvas.height; }
+    const real = this.g;
+    this.g = c.getContext('2d')!;
+    this.g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    try { draw(); } finally { this.g = real; }
+    return c;
+  }
+  private drawRoots(t: number, P: (x: number, y: number) => P2, U: number) {
+    this.g.globalCompositeOperation = 'lighter';
+    for (const rt of this.roots) {
+      const p = clamp((t - rt.t0) / rt.dur);
       if (p <= 0) continue;
-      const sw = Math.sin(t * 0.8 + h.seed) * 0.02 * clamp(t - h.t0 - h.dur);
+      const pts = rt.pts.map(([x, y]) => P(x, y));
+      this.line(pts, p, rt.w * U * 3, 'rgba(70,140,255,0.13)');
+      this.line(pts, p, Math.max(0.8, rt.w * U), 'rgba(170,215,255,0.8)');
+    }
+    this.g.globalCompositeOperation = 'source-over';
+  }
+
+  /** one stem and its leaves; returns how to draw its flower (drawn after all the stems), if it has one yet */
+  private stem(h: Head, t: number, U: number, P: (x: number, y: number) => P2, tipOut?: (p: P2) => void): (() => void) | undefined {
+      const g = this.g;
+      const p = eio((t - h.t0) / h.dur);
+      if (p <= 0) return undefined;
+      const sw = h.field ? 0 : Math.sin(t * 0.8 + h.seed) * 0.02 * clamp(t - h.t0 - h.dur);
       const ca = Math.cos(sw), sa = Math.sin(sw);
       const rot = (q: P2): P2 => [q[0] * ca - q[1] * sa, q[0] * sa + q[1] * ca];
       const tip = rot(h.tip), c1 = rot([h.tip[0] * 0.08 + h.bow, h.tip[1] * 0.35]), c2 = rot([h.tip[0] * 0.8 + h.bow * 1.3, h.tip[1] * 0.72]);
       const pts: P2[] = [];
-      for (let i = 0; i <= 32; i++) { const q = bez([0, 0], c1, c2, tip, i / 32); pts.push(P(q[0], q[1])); }
+      for (let i = 0; i <= 32; i++) { const q = bez([0, 0], c1, c2, tip, i / 32); pts.push(P(h.root + q[0], q[1])); }
       const dim = h.depth === 0 ? 0.7 : 1;
-      this.line(pts, p, Math.max(2, U * 0.016), `rgba(20,70,34,${dim})`);
-      this.line(pts, p, Math.max(1, U * 0.008), `rgba(70,150,60,${0.9 * dim})`);
+      this.line(pts, p, Math.max(1.5, U * 0.016 * h.thin), `rgba(20,70,34,${dim})`);
+      this.line(pts, p, Math.max(1, U * 0.008 * h.thin), `rgba(70,150,60,${0.9 * dim})`);
       g.globalCompositeOperation = 'lighter';
       this.line(pts, p, Math.max(1, U * 0.003), `rgba(140,230,200,${0.25 * dim})`);
       g.globalCompositeOperation = 'source-over';
@@ -354,20 +506,14 @@ export class Bloom {
         const side = lf.side || (h.tip[0] >= 0 ? 1 : -1);
         this.leaf(q, ang + side * 0.75, U * lf.L * k, side * 0.6, dim);
       }
-      if (h === held) heldTip = pts[Math.round(p * 32)];
+      tipOut?.(pts[Math.round(p * 32)]);
       const art = this.artOf(h);
       if (p > 0.85 && art) {
         const end = pts[32], pre = pts[29];
         const dir = Math.atan2(end[1] - pre[1], end[0] - pre[0]) + Math.PI / 2;
-        flowers.push(() => this.flower(h, art, end, dir + h.spin * (art.star ? 1 : 0.35), t, U));
+        return () => this.flower(h, art, end, dir + h.spin * (art.star ? 1 : 0.35), t, U);
       }
-    }
-    for (const f of flowers) f();
-
-    if (!live) return;
-    this.drawWaiting(held, heldTip);
-    this.spawnMotes(t);
-    this.drawMotes();
+      return undefined;
   }
 
   private P: (x: number, y: number) => P2 = (x, y) => [x, y];
@@ -378,7 +524,7 @@ export class Bloom {
     if (t > 8 && this.motes.length < 60 && Math.random() < 0.35) {
       const h = this.heads[Math.floor(Math.random() * this.heads.length)];
       if (t > h.t0 + h.dur + 0.5) {
-        const [x, y] = P(h.tip[0], h.tip[1] - h.size * 0.3);
+        const [x, y] = P(h.root + h.tip[0], h.tip[1] - h.size * 0.3);
         this.mote(x + (Math.random() - 0.5) * U * h.size * 0.8, y + (Math.random() - 0.5) * U * h.size * 0.4, (Math.random() - 0.5) * 12, -14 - Math.random() * 24, 3 + Math.random() * 2.5, 0.7 + Math.random() * 1.4);
       }
     }
@@ -393,7 +539,7 @@ export class Bloom {
     const open = clamp((t - bloomStart) / (h.main ? 3.4 : 2.8));
     const grow = eo((t - h.t0 - h.dur * 0.8) / 1.4);
     if (grow <= 0.01) return;
-    if (open > 0.4) this.cue(`b${h.seed}`, 'bloom');
+    if (open > 0.4 && (!h.field || h.seed < 30)) this.cue(`b${h.seed}`, 'bloom');
     const big = Math.max(A.w, A.h);
     const k = ((h.size * U) / big) * (0.55 + 0.45 * grow) * (1 + Math.sin(t * 1.3 + h.seed) * 0.01 * open);
     const px = A.pivot[0] * A.w, py = A.pivot[1] * A.h;
@@ -414,7 +560,7 @@ export class Bloom {
       g.restore();
     } else {
       // folded: every wedge turned towards the top; opening, the outer ones last
-      const N = 30, closedK = A.star ? 0.08 : 0.1, r0 = A.star ? 0.5 : 0.6, R = Math.hypot(A.w, A.h) * 1.2, eps = (TAU / N) * 0.12;
+      const N = h.field ? 16 : 30, closedK = A.star ? 0.08 : 0.1, r0 = A.star ? 0.5 : 0.6, R = Math.hypot(A.w, A.h) * 1.2, eps = (TAU / N) * 0.12;
       const order = WEDGES[N] ??= Array.from({ length: N }, (_, i) => i).sort((a, b) => Math.abs(this.phi(a, N)) - Math.abs(this.phi(b, N)));
       for (const i of order) {
         const phi = this.phi(i, N);

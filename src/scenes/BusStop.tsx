@@ -242,6 +242,7 @@ export function BusStop({ flying, entered }: Props) {
     bf: { mode: 'off' as 'off' | 'in' | 'perch' | 'away', t: 0, from: [0, 0] as Vec2, to: [0, 0] as Vec2, x: 0, y: 0, tilt: 0 },
     garden: 0, birds: 0,                                               // (how much the story has let in; the clock does the rest)
     hour: DAY_START, clock: false,                                     // the day's clock, and whether it's running
+    rush: 1,                                                           // ×: the clock hurrying on to the next moment
     glow: 0,                                                           // the end: the lights glow a little brighter
     blackout: false,                                                   // her flower has the (black) screen to itself
     banner: false, row0: 0, row1: 0, row2: 0, away: 0,                // the fairies' bunting
@@ -410,7 +411,7 @@ export function BusStop({ flying, entered }: Props) {
       if (rawDt < 0.25) adapt(rawDt, now); // (a long gap is the tab being away, not slowness)
 
       // ── the day's clock (real time: it doesn't wait for anything; paused while the tab is hidden) ──
-      if (S.clock && S.hour < DAY_END) S.hour = Math.min(DAY_END, S.hour + (Math.min(rawDt, 0.25) * SPEED) / SECONDS_PER_HOUR);
+      if (S.clock && S.hour < DAY_END) S.hour = Math.min(DAY_END, S.hour + (Math.min(rawDt, 0.25) * SPEED * S.rush) / SECONDS_PER_HOUR);
       const look = dayLook(S.hour);
       S.night = look.night;
       const minute = Math.floor(S.hour * 12);
@@ -692,8 +693,20 @@ export function BusStop({ flying, entered }: Props) {
   const tapPluck = () => new Promise<void>((r) => { waiters.current.pluck = r; }).then(live);
   const tapNote = () => new Promise<void>((r) => { waiters.current.note = r; }).then(live);
   const chosen = () => new Promise<string>((r) => { waiters.current.answer = r; }).then(live);
-  /** waits until the day's clock reaches this hour */
-  const until = async (hour: number) => { while (S.hour < hour) await wait(0.2); };
+  /** Waits until the day's clock reaches this hour. Nobody waits around for it, though: after a short
+   *  breath the clock hurries on (the light sweeping through the hours in a few seconds) so the next
+   *  moment comes right away, and then goes back to its own pace. */
+  const until = async (hour: number, breath = 0.9) => {
+    if (S.hour >= hour) return;
+    await wait(breath);
+    const left = hour - S.hour;
+    if (left > 0.05) {
+      // (about 3 s for a short hop, up to 5 s for a long one: quick, but the light still visibly moves)
+      const secs = Math.min(5, 2.6 + left * 0.9);
+      S.rush = Math.max(1, (left * SECONDS_PER_HOUR) / (SPEED * secs));
+    }
+    try { while (S.hour < hour) await wait(0.1); } finally { S.rush = 1; }
+  };
 
   async function story() {
     const reduced = prefersReducedMotion();
@@ -759,11 +772,16 @@ export function BusStop({ flying, entered }: Props) {
     }
 
     if (skip !== 'question') {
-      // the animals come through the day, each at its hour
+      // the animals come through the day, each at its hour; as soon as she closes one's note, the day
+      // hurries on to the next one's hour (while the last one is still turning to dust)
+      let gone: Promise<void> = Promise.resolve();
       for (let i = 0; i < CARDS.length; i++) {
-        await until(ANIMAL_HOURS[i]);
-        await visit(i);
+        await until(ANIMAL_HOURS[i], i === 0 ? 0.9 : 0.5);
+        ({ gone } = await visit(i));
+        gone.catch(() => {});
       }
+      await until(QUESTION_HOUR, 0.5);
+      await gone;
     }
     await until(QUESTION_HOUR);
     await wait(1);
@@ -1016,8 +1034,8 @@ export function BusStop({ flying, entered }: Props) {
     await note.current!.close().then(live);
     gsap.to(a, { offer: 0, head: 0, duration: 0.4, ease: 'sine.inOut' });
 
-    // …and dissolves into golden dust (the day goes on by itself, on the clock)
-    await dissolve(i);
+    // …and dissolves into golden dust (meanwhile the day moves on to whoever comes next)
+    return { gone: dissolve(i) };
   }
 
   const reduced = () => prefersReducedMotion();
@@ -1162,6 +1180,7 @@ export function BusStop({ flying, entered }: Props) {
     let blooms = 0;
     bq.onCue = (c) => {
       if (c === 'land') playPop(0.6);
+      else if (c === 'spread') playShimmer(3.4); // (the roots running out to the edges)
       else if (blooms++ === 0) playShimmer(2.6); else playPop(1.2 + Math.random() * 0.4);
     };
     bouquetRef.current = bq;
