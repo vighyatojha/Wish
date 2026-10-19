@@ -23,6 +23,7 @@ type RGB = [number, number, number];
 const TAU = Math.PI * 2;
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const eo = (t: number) => { t = clamp(t); return 1 - (1 - t) ** 3; };
+const backOut = (t: number) => { t = clamp(t); const c = 1.9; return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2; };
 const eio = (t: number) => { t = clamp(t); return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2; };
 const spring = (t: number, k = 6, w = 11) => (t <= 0 ? 0 : 1 - Math.exp(-t * k) * Math.cos(t * w));
 function rng(seed: number) {
@@ -120,8 +121,8 @@ export function preloadFlowers(): void {
   (Object.keys(BUNCH) as FlowerKind[]).forEach((k) => void loadArt(BUNCH[k][0]));
 }
 
-interface Root { pts: P2[]; t0: number; dur: number; w: number; field?: boolean }
-interface Head { vi: number; star: boolean; waited: number; art?: Art; main: boolean; root: number; field: boolean; thin: number; tip: P2; bow: number; t0: number; dur: number; size: number; spin: number; depth: number; seed: number; leaves: { u: number; side: number; L: number }[] }
+interface Root { pts: P2[]; t0: number; dur: number; w: number; field?: boolean; fadeAt?: number }
+interface Head { vi: number; star: boolean; waited: number; art?: Art; main: boolean; root: number; gy: number; fade: number; grass?: number; field: boolean; thin: number; tip: P2; bow: number; t0: number; dur: number; size: number; spin: number; depth: number; seed: number; leaves: { u: number; side: number; L: number }[] }
 interface Mote { x: number; y: number; vx: number; vy: number; life: number; age: number; r: number; tw: number }
 
 const BLUE = [110, 180, 255] as const;
@@ -190,7 +191,7 @@ export class Bloom {
     // a bunch: the first one in the middle, then the others around it, each its own colour;
     // depth 0 = behind (a little dimmer), 2 = in front
     const H = (vi: number, main: boolean, tip: P2, bow: number, t0: number, dur: number, size: number, spin: number, depth: number): Head => ({
-      vi, star: !!this.variants[vi].star, waited: 0, main, root: 0, field: false, thin: 1, tip, bow, t0, dur, size, spin, depth, seed: r() * 100,
+      vi, star: !!this.variants[vi].star, waited: 0, main, root: 0, gy: 0, fade: 1, field: false, thin: 1, tip, bow, t0, dur, size, spin, depth, seed: r() * 100,
       leaves: [{ u: 0.28 + r() * 0.1, side: r() < 0.5 ? -1 : 1, L: 0.17 + r() * 0.06 }, { u: 0.5 + r() * 0.1, side: 0, L: 0.13 + r() * 0.05 }],
     });
     const n = BUNCH[this.kind].length;
@@ -212,89 +213,59 @@ export class Bloom {
   //    of her flowers come up, in all their colours: a whole field of them (it depends on the screen's shape) ──
   private bunchEnd = 0;
   private spreadAt = 12.2;
-  private spreadDur = 1;
-  private reach = 1;
   private planField() {
     this.heads = this.heads.filter((h) => !h.field);
     this.roots = this.roots.filter((rt) => !rt.field);
     const r = rng(777);
-    const { W, U } = { W: this.W, U: this.layout().U };
-    const reach = (this.reach = Math.max(0.75, W / 2 / U - 0.08));
-    const t0 = this.spreadAt, dur = (this.spreadDur = 2.4 + reach * 1.7);
-    const at = (x: number) => t0 + dur * (Math.abs(x) / reach); // when the running root gets there
+    const { W, H } = this, { U, base } = this.layout();
+    const bottom = (H - base[1]) / U;
+    const portrait = W / H < 1;
+    const reach = Math.max(0.7, W / 2 / U - 0.06);
+    const t0 = this.spreadAt;
     const s0 = this.kind === 'Tulip' ? 0.46 : 0.74;
     const nv = this.variants.length;
     let lastV = 0;
     const pick = () => { let v = Math.floor(r() * nv); if (v === lastV) v = (v + 1) % nv; return (lastV = v); };
-    // the two running roots, just under the ground, wandering a little
-    for (const side of [-1, 1]) {
-      const pts: P2[] = [], m = 28;
-      const ph = r() * 6;
-      for (let i = 0; i <= m; i++) {
-        const u = i / m;
-        pts.push([side * reach * u, 0.03 + u * 0.035 + Math.sin(u * 11 + ph) * 0.014 + Math.sin(u * 29 + ph) * 0.005]);
-      }
-      this.roots.push({ pts, t0, dur, w: 0.0055, field: true });
-      // fine rootlets hanging off it as it goes, like the hairs on a real root
-      for (let i = 2; i < m; i++) {
-        if (r() < 0.45) continue;
-        const [x0, y0] = pts[i], q: P2[] = [[x0, y0]];
-        let a = Math.PI / 2 + (r() - 0.5) * 1.2, x = x0, y = y0;
-        const len = 0.03 + r() * 0.06;
-        for (let k = 1; k <= 4; k++) { a += (r() - 0.5) * 0.7; x += Math.cos(a) * len / 4; y += Math.sin(a) * len / 4; q.push([x, y]); }
-        this.roots.push({ pts: q, t0: t0 + dur * (i / m), dur: 0.7, w: 0.0028, field: true });
-      }
+
+    // Scattered over the dark ground, near and far, like a meadow seen at night: the far ones small and
+    // dim with their stems rising from higher up, the near ones big, a couple right at the front. Placed
+    // at random (no rows), each flower clear of the others and of the bunch.
+    // (z: 0 = nearest, 1 = farthest)
+    type Spot = { x: number; z: number; scale: number; gy: number; h: number; lean: number; hx: number; hy: number; size: number };
+    const taken: { hx: number; hy: number; size: number; k: number }[] = this.heads.map((hd) => ({ hx: hd.tip[0], hy: hd.tip[1] - hd.size * 0.3, size: hd.size, k: 0.72 }));
+    const want = Math.round(Math.min(26, Math.max(7, reach * 10.5)));
+    const spots: Spot[] = [];
+    for (let tries = 0; tries < 900 && spots.length < want; tries++) {
+      const x = (r() * 2 - 1) * reach;
+      const z = r() ** 0.85;
+      const near = 1 - z;
+      const scale = 0.42 + 0.8 * near ** 1.6;                 // size with distance
+      const gy = (bottom + 0.25) * near ** 2 - 0.62 * z;      // where its stem starts: further = higher up, nearest off the bottom
+      const h = (0.35 + r() * 1.0) * scale;
+      const lean = (r() - 0.5) * 0.12 * scale;
+      const size = s0 * 0.68 * scale;
+      const hx = x + lean, hy = gy - h - size * 0.3;
+      if (hy < -1.75 || hy + size * 0.4 > bottom || Math.abs(hx) > reach + (portrait ? 0.15 : 0.05)) continue;  // (not up into her name, not off the screen)
+      if (z < 0.45 && Math.abs(hx) < 0.42) continue;           // (nothing near standing in front of the bunch's stems)
+      // (far ones, behind the bunch, may peek out from behind it on a narrow screen)
+      if (taken.some((o) => Math.hypot(o.hx - hx, (o.hy - hy) * 1.15) < (o.size + size) * (o.k > 0.6 && z > 0.5 && portrait ? 0.48 : o.k))) continue;
+      taken.push({ hx, hy, size, k: 0.52 });
+      spots.push({ x, z, scale, gy, h, lean, hx, hy, size });
     }
-    // a little tuft of roots under each new plant
-    const tuft = (x: number, t: number) => {
-      for (const a of [Math.PI / 2 - 0.5, Math.PI / 2 + 0.5, Math.PI / 2]) {
-        const pts: P2[] = [[x, 0.03]], len = 0.08 + r() * 0.07;
-        let px = x, py = 0.03, aa = a;
-        for (let i = 1; i <= 5; i++) { aa += (r() - 0.5) * 0.6; px += Math.cos(aa) * len / 5; py += Math.sin(aa) * len / 5; pts.push([px, py]); }
-        this.roots.push({ pts, t0: t, dur: 0.9, w: 0.0035, field: true });
-      }
-    };
-    const plant = (x: number, back: boolean) => {
-      const d = Math.abs(x) / reach, sgn = Math.sign(x) || 1;
-      const t = at(x) + 0.15;
-      if (!back) tuft(x, t - 0.1);
-      // nearer the edges a little shorter; the back row taller and dimmer, peeping over
-      const h = (back ? 0.8 : 0.6) - 0.2 * d + (r() - 0.5) * 0.16;
-      const size = s0 * (back ? 0.46 : 0.58) * (1 - 0.18 * d);
-      const vi = pick();
-      const star = !!this.variants[vi].star;
-      const head: Head = {
-        vi, star, waited: 0, main: false, root: x, field: true, thin: back ? 0.55 : 0.7,
-        tip: [sgn * (0.03 + r() * 0.05), -h], bow: sgn * 0.04 * (r() - 0.3), t0: t + (back ? 0.35 : 0), dur: 1.6 + h * 0.9,
-        size: size * (star ? 0.85 : 1), spin: sgn * (0.1 + r() * 0.12) * (star ? 2 : 1), depth: back ? 0 : 2, seed: r() * 100,
-        leaves: [{ u: 0.3 + r() * 0.1, side: r() < 0.5 ? -1 : 1, L: (0.1 + r() * 0.05) * (0.5 + h) }, { u: 0.52 + r() * 0.1, side: 0, L: (0.08 + r() * 0.04) * (0.5 + h) }],
-      };
-      this.heads.push(head);
-      // now and then a second, smaller flower branching off the same stem
-      if (!back && r() < 0.4) {
-        const v2 = pick();
-        this.heads.push({ ...head, vi: v2, star: !!this.variants[v2].star, art: undefined, tip: [sgn * (0.13 + r() * 0.05), -h * 0.68], bow: sgn * 0.06, t0: head.t0 + 0.5, dur: head.dur * 0.8, size: head.size * 0.72, seed: r() * 100, depth: 1, leaves: [head.leaves[0]] });
-      }
-    };
-    if (reach < 1.25) {
-      for (const [x, hh] of [[0.36, 1.12], [0.66, 0.98], [-0.38, 1.1], [-0.64, 0.96]] as const) {
-        const vi = pick(), star = !!this.variants[vi].star, sgn = Math.sign(x);
-        this.heads.push({
-          vi, star, waited: 0, main: false, root: x * 0.5, field: true, thin: 0.5,
-          tip: [x * 0.5 + sgn * 0.05, -hh], bow: sgn * 0.03, t0: t0 + 0.6 + r() * 1.6, dur: 2.2,
-          size: s0 * 0.42 * (star ? 0.85 : 1), spin: sgn * 0.15, depth: 0, seed: r() * 100,
-          leaves: [{ u: 0.4 + r() * 0.1, side: sgn, L: 0.12 }],
-        });
-      }
-    }
-    const step = 0.27, start = Math.min(0.74, reach - 0.08);
-    for (let x = start; x <= reach - 0.06; x += step) {
-      for (const sgn of [-1, 1]) {
-        const jx = (r() - 0.5) * 0.06;
-        plant(sgn * (x + jx), false);
-        if (x + step / 2 <= reach - 0.06) plant(sgn * (x + step / 2 + jx), true);
-      }
-    }
+    // they come up one after another in no particular order, a beat apart
+    for (let i = spots.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [spots[i], spots[j]] = [spots[j], spots[i]]; }
+    spots.forEach(({ x, z, scale, gy, h, lean, size }, k) => {
+      const near = 1 - z;
+      const vi = pick(), star = !!this.variants[vi].star;
+      const start = t0 + 0.4 + k * (portrait ? 0.45 : 0.32);
+      this.heads.push({
+        vi, star, waited: 0, main: false, root: x, field: true, thin: 0.4 + 0.45 * scale, gy, fade: 0.45 + 0.55 * near,
+        tip: [lean, -h], bow: (r() - 0.5) * 0.1 * scale, t0: start, dur: 1.7 + r() * 0.6,
+        size: size * (star ? 0.85 : 1), spin: (r() - 0.5) * 0.3 * (star ? 2 : 1), depth: 2.4 - z * 4, seed: r() * 100,
+        leaves: [{ u: 0.45 + r() * 0.1, side: r() < 0.5 ? -1 : 1, L: (0.1 + r() * 0.04) * scale }, { u: 0.62 + r() * 0.1, side: 0, L: (0.08 + r() * 0.03) * scale }],
+        grass: 2 + Math.floor(r() * 2),
+      });
+    });
     this.heads.sort((a, b) => a.depth - b.depth);
   }
 
@@ -304,8 +275,7 @@ export class Bloom {
     // (phones: their screens are dense; 1.5× is plenty for soft, glowing flowers)
     this.dpr = Math.min(window.devicePixelRatio || 1, window.matchMedia?.('(pointer: coarse)').matches ? 1.5 : 2);
     this.snap = null;
-    this.rootCache = this.backCache = this.frontCache = null;
-    this.baked.clear();
+    this.rootCache = null;
     this.canvas.width = Math.round(W * this.dpr);
     this.canvas.height = Math.round(H * this.dpr);
   }
@@ -353,6 +323,12 @@ export class Bloom {
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.fillStyle = '#000';
     g.fillRect(0, 0, W, H);
+    // the view starts close on her flower and slowly draws back as the meadow comes up around it
+    if (!this.snap) {
+      const zoom = 1 + (W / H < 1 ? 0.07 : 0.15) * (1 - eio((t - this.spreadAt + 0.5) / 4.5));
+      const [bx, by] = this.base();
+      g.translate(bx, by); g.scale(zoom, zoom); g.translate(-bx, -by);
+    }
     if (this.snap) {
       const [bx, by] = this.base();
       const sw = Math.sin((t - this.settledAt) * 0.7) * 0.006;
@@ -401,14 +377,13 @@ export class Bloom {
     // ── the dark earth: a faint line of light where it begins, and the roots glowing in it ──
     const show = eo(t / 1.5);
     g.globalCompositeOperation = 'lighter';
-    const spread = eio((t - this.spreadAt) / this.spreadDur);
-    const half = U * (1 + Math.max(0, this.reach + 0.1 - 1) * spread);
+    const half = U;
     const sl = g.createLinearGradient(base[0] - half, 0, base[0] + half, 0);
     sl.addColorStop(0, 'rgba(90,150,255,0)'); sl.addColorStop(0.5, `rgba(90,150,255,${0.2 * show})`); sl.addColorStop(1, 'rgba(90,150,255,0)');
     g.fillStyle = sl; g.fillRect(base[0] - half, base[1] - 1, half * 2, 2);
     if (t > this.spreadAt) this.cue('spread', 'spread');
     // (once every root has finished growing they're drawn once, into a picture, and that's reused)
-    const rootsDone = this.roots.reduce((m, rt) => Math.max(m, rt.t0 + rt.dur), 0);
+    const rootsDone = this.roots.reduce((m, rt) => Math.max(m, rt.t0 + rt.dur, (rt.fadeAt ?? 0) + 2), 0);
     if (t > rootsDone && !this.rootCache) this.rootCache = this.offscreen(() => this.drawRoots(t, P, U));
     if (this.rootCache) { g.globalCompositeOperation = 'lighter'; g.drawImage(this.rootCache, 0, 0, this.W, H); }
     else this.drawRoots(t, P, U);
@@ -432,23 +407,18 @@ export class Bloom {
     if (sprout > 0.01) for (const side of [-1, 1]) this.leaf(P(0, -0.07 * clamp((t - 3.6) / 0.8)), -Math.PI / 2 + side * 1.05, U * 0.07 * sprout, side * 0.4);
 
     // ── stems and leaves (all), then the flowers back to front ──
-    // (a flower of the field that has fully opened stays still: it's drawn once into a picture, behind or in
-    //  front of the bunch, so a screen full of flowers costs no more to draw than a few)
-    for (const h of this.heads) {
-      if (!h.field || this.baked.has(h) || !h.art || t < h.t0 + h.dur + 0.5 + 2.8 + 0.6) continue;
-      this.baked.add(h);
-      const into = h.depth === 0 ? (this.backCache ??= this.offscreen(() => {})) : (this.frontCache ??= this.offscreen(() => {}));
-      this.offscreen(() => { const f = this.stem(h, t, U, P); f?.(); }, into);
-    }
-    if (this.backCache) g.drawImage(this.backCache, 0, 0, this.W, H);
+    // (the field is drawn far to near, each plant whole, so nearer flowers stand in front of farther ones;
+    //  the bunch's own stems go first and its flowers after, as before)
     const flowers: (() => void)[] = [];
+    let bunchDrawn = false;
+    const drawBunchFlowers = () => { if (!bunchDrawn) { bunchDrawn = true; for (const f of flowers) f(); } };
     for (const h of this.heads) {
-      if (this.baked.has(h)) continue;
+      if (h.field && h.depth > 1.05) drawBunchFlowers(); // (the near part of the field: in front of the bunch)
       const f = this.stem(h, t, U, P, h === held ? (tp) => { heldTip = tp; } : undefined);
-      if (f) flowers.push(f);
+      if (!f) continue;
+      if (h.field) f(); else flowers.push(f);
     }
-    for (const f of flowers) f();
-    if (this.frontCache) g.drawImage(this.frontCache, 0, 0, this.W, H);
+    drawBunchFlowers();
 
     if (!live) return;
     this.drawWaiting(held, heldTip);
@@ -457,9 +427,6 @@ export class Bloom {
   }
 
   private rootCache: HTMLCanvasElement | null = null;
-  private backCache: HTMLCanvasElement | null = null;
-  private frontCache: HTMLCanvasElement | null = null;
-  private baked = new Set<Head>();
   /** draws into another canvas (a new one the size of this one, or the one given) */
   private offscreen(draw: () => void, c?: HTMLCanvasElement): HTMLCanvasElement {
     if (!c) { c = document.createElement('canvas'); c.width = this.canvas.width; c.height = this.canvas.height; }
@@ -475,10 +442,32 @@ export class Bloom {
       const p = clamp((t - rt.t0) / rt.dur);
       if (p <= 0) continue;
       const pts = rt.pts.map(([x, y]) => P(x, y));
-      this.line(pts, p, rt.w * U * 3, 'rgba(70,140,255,0.13)');
-      this.line(pts, p, Math.max(0.8, rt.w * U), 'rgba(170,215,255,0.8)');
+      // (a field root fades to a faint thread once its flower is up: the meadow, not the roots, is the picture)
+      const a = rt.fadeAt === undefined ? 1 : 1 - 0.85 * clamp((t - rt.fadeAt) / 2);
+      this.line(pts, p, rt.w * U * 3, `rgba(70,140,255,${0.13 * a})`);
+      this.line(pts, p, Math.max(0.6, rt.w * U), `rgba(170,215,255,${0.8 * a})`);
     }
     this.g.globalCompositeOperation = 'source-over';
+  }
+
+  private grass(h: Head, at: P2, t: number, U: number, dim: number) {
+    const g = this.g, n = h.grass ?? 0;
+    for (let i = 0; i < n; i++) {
+      const k = eo((t - h.t0 - 0.35 - i * 0.12) / 0.9);
+      if (k <= 0.01) continue;
+      // a blade arcs up and over to one side, like a quarter circle, fading into the dark at its foot
+      const side = i % 2 ? 1 : -1, L = U * h.size * (0.7 + 0.3 * ((h.seed * (i + 3)) % 1)) * k;
+      const sway = Math.sin(t * 0.7 + h.seed + i) * 0.04 * L;
+      const bx = at[0] + side * L * 0.02, by = at[1] + L * 0.25; // (its foot, a little below the stem's: in the dark)
+      const ex = bx + side * L * (0.55 + 0.1 * i) + sway, ey = by - L * (0.95 - 0.12 * i);
+      const lg = g.createLinearGradient(0, by, 0, ey);
+      lg.addColorStop(0, 'rgba(40,140,80,0)'); lg.addColorStop(0.5, `rgba(45,150,85,${0.6 * dim})`); lg.addColorStop(1, `rgba(110,215,160,${0.85 * dim})`);
+      const w = L * 0.045;
+      g.beginPath(); g.moveTo(bx - side * w, by);
+      g.quadraticCurveTo(bx - side * w, ey + (by - ey) * 0.05, ex, ey);
+      g.quadraticCurveTo(bx + side * w, ey + (by - ey) * 0.2, bx + side * w, by);
+      g.fillStyle = lg; g.fill();
+    }
   }
 
   /** one stem and its leaves; returns how to draw its flower (drawn after all the stems), if it has one yet */
@@ -486,17 +475,32 @@ export class Bloom {
       const g = this.g;
       const p = eio((t - h.t0) / h.dur);
       if (p <= 0) return undefined;
-      const sw = h.field ? 0 : Math.sin(t * 0.8 + h.seed) * 0.02 * clamp(t - h.t0 - h.dur);
+      const sw = h.field
+        ? Math.sin(t * 0.6 + h.seed) * 0.045 * clamp((t - h.t0 - h.dur) / 2)   // (±2.5°, slowly, like in the wind)
+        : Math.sin(t * 0.8 + h.seed) * 0.02 * clamp(t - h.t0 - h.dur);
       const ca = Math.cos(sw), sa = Math.sin(sw);
       const rot = (q: P2): P2 => [q[0] * ca - q[1] * sa, q[0] * sa + q[1] * ca];
       const tip = rot(h.tip), c1 = rot([h.tip[0] * 0.08 + h.bow, h.tip[1] * 0.35]), c2 = rot([h.tip[0] * 0.8 + h.bow * 1.3, h.tip[1] * 0.72]);
       const pts: P2[] = [];
-      for (let i = 0; i <= 32; i++) { const q = bez([0, 0], c1, c2, tip, i / 32); pts.push(P(h.root + q[0], q[1])); }
-      const dim = h.depth === 0 ? 0.7 : 1;
-      this.line(pts, p, Math.max(1.5, U * 0.016 * h.thin), `rgba(20,70,34,${dim})`);
-      this.line(pts, p, Math.max(1, U * 0.008 * h.thin), `rgba(70,150,60,${0.9 * dim})`);
+      for (let i = 0; i <= 32; i++) { const q = bez([0, 0], c1, c2, tip, i / 32); pts.push(P(h.root + q[0], h.gy + q[1])); }
+      const dim = h.field ? h.fade : h.depth === 0 ? 0.7 : 1;
+      // (a field stem rises out of the darkness: transparent at the bottom, solid a third of the way up)
+      const col = (rgb: string, a: number): string | CanvasGradient => {
+        if (!h.field) return `rgba(${rgb},${a})`;
+        const lg = g.createLinearGradient(pts[0][0], pts[0][1], pts[12][0], pts[12][1]);
+        lg.addColorStop(0, `rgba(${rgb},0)`); lg.addColorStop(1, `rgba(${rgb},${a})`);
+        return lg;
+      };
+      if (h.field) {
+        const sp = (t - h.t0 + 0.35) / 1.4;
+        if (sp > 0 && sp < 1) this.glow(pts[0][0], pts[0][1] - U * 0.02, U * h.size * 0.5 * (0.6 + 0.4 * sp), 0.7 * Math.sin(Math.PI * sp) * h.fade);
+        if (!this.cued.has(`s${h.seed}`) && sp > 0.2) { this.cued.add(`s${h.seed}`); for (let i = 0; i < 6; i++) this.mote(pts[0][0], pts[0][1], (Math.random() - 0.5) * 40, -10 - Math.random() * 30, 1 + Math.random(), 0.6 + Math.random()); }
+        if (h.grass) this.grass(h, pts[0], t, U, dim);
+      }
+      this.line(pts, p, Math.max(1.5, U * 0.016 * h.thin), col('20,70,34', dim));
+      this.line(pts, p, Math.max(1, U * 0.008 * h.thin), col('70,150,60', 0.9 * dim));
       g.globalCompositeOperation = 'lighter';
-      this.line(pts, p, Math.max(1, U * 0.003), `rgba(140,230,200,${0.25 * dim})`);
+      this.line(pts, p, Math.max(1, U * 0.003 * Math.min(1, h.thin * 1.4)), col('140,230,200', 0.25 * dim));
       g.globalCompositeOperation = 'source-over';
       for (const lf of h.leaves) {
         if (p < lf.u) continue;
@@ -524,7 +528,7 @@ export class Bloom {
     if (t > 8 && this.motes.length < 60 && Math.random() < 0.35) {
       const h = this.heads[Math.floor(Math.random() * this.heads.length)];
       if (t > h.t0 + h.dur + 0.5) {
-        const [x, y] = P(h.root + h.tip[0], h.tip[1] - h.size * 0.3);
+        const [x, y] = P(h.root + h.tip[0], h.gy + h.tip[1] - h.size * 0.3);
         this.mote(x + (Math.random() - 0.5) * U * h.size * 0.8, y + (Math.random() - 0.5) * U * h.size * 0.4, (Math.random() - 0.5) * 12, -14 - Math.random() * 24, 3 + Math.random() * 2.5, 0.7 + Math.random() * 1.4);
       }
     }
@@ -535,24 +539,25 @@ export class Bloom {
   private flower(h: Head, A: Art, at: P2, dir: number, t: number, U: number) {
     const g = this.g;
     // the bud forms as the stem finishes, waits a moment, then opens slowly
-    const bloomStart = h.t0 + h.dur + (h.main ? 0.9 : 0.5);
-    const open = clamp((t - bloomStart) / (h.main ? 3.4 : 2.8));
-    const grow = eo((t - h.t0 - h.dur * 0.8) / 1.4);
+    const bloomStart = h.t0 + h.dur + (h.main ? 0.9 : h.field ? 0.15 : 0.5);
+    const open = clamp((t - bloomStart) / (h.main ? 3.4 : h.field ? 1.5 : 2.8));
+    // (a field flower pops: it swells a touch past its size, then settles)
+    const grow = h.field ? backOut((t - h.t0 - h.dur * 0.85) / 0.9) : eo((t - h.t0 - h.dur * 0.8) / 1.4);
     if (grow <= 0.01) return;
     if (open > 0.4 && (!h.field || h.seed < 30)) this.cue(`b${h.seed}`, 'bloom');
     const big = Math.max(A.w, A.h);
-    const k = ((h.size * U) / big) * (0.55 + 0.45 * grow) * (1 + Math.sin(t * 1.3 + h.seed) * 0.01 * open);
+    const k = ((h.size * U) / big) * (h.field ? grow : 0.55 + 0.45 * grow) * (1 + Math.sin(t * 1.3 + h.seed) * 0.01 * open);
     const px = A.pivot[0] * A.w, py = A.pivot[1] * A.h;
     // a halo of its own colour behind it (centred on the flower, above where it joins the stem)
     const up = (A.star ? 0 : py - A.h * 0.45) * k;
     const cx = at[0] + Math.sin(dir) * up, cy = at[1] - Math.cos(dir) * up;
-    const halo = big * k * (0.55 + 0.3 * open), ha = (0.16 + 0.14 * open) * grow * (h.depth === 0 ? 0.6 : 1);
+    const halo = big * k * (0.55 + 0.3 * open), ha = (0.16 + 0.14 * open) * Math.min(1, grow) * (h.field ? h.fade * h.fade : h.depth === 0 ? 0.6 : 1);
     g.globalCompositeOperation = 'lighter';
     g.globalAlpha = ha;
     g.drawImage(A.glow, cx - halo, cy - halo, halo * 2, halo * 2);
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
-    const img = h.depth === 0 ? A.dim : A.img;
+    const img = (h.field ? h.fade < 0.78 : h.depth === 0) ? A.dim : A.img;
     if (open >= 1) {
       g.save();
       g.translate(at[0], at[1]); g.rotate(dir); g.scale(k, k);
@@ -584,7 +589,7 @@ export class Bloom {
   private phi(i: number, N: number) { return -Math.PI + ((i + 0.5) / N) * TAU; }
 
   // ── small things ──
-  private line(pts: P2[], frac: number, w: number, col: string) {
+  private line(pts: P2[], frac: number, w: number, col: string | CanvasGradient) {
     const g = this.g, n = pts.length - 1, end = frac * n;
     if (end <= 0) return;
     g.beginPath();
