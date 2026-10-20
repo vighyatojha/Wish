@@ -35,7 +35,7 @@ import { gsap, useGSAP, ease } from '../lib/motion';
 import { buzz, prefersReducedMotion, isTouch } from '../lib/device';
 import {
   createRainSound, createWindSound, createCrickets, playWhoosh, playSnap, playAirRelease, playDoor, playStep,
-  playShimmer, playChime, playPop, playMusicBox, isMuted, setMuted, onMute, type LiveSound,
+  playShimmer, playChime, playPop, playMusicBox, isMuted, setMuted, onMute, prepareSong, playSong, unlockAudio, type LiveSound,
 } from '../lib/audio';
 import { dayLook, formatHour, DAY_START, DAY_END, SECONDS_PER_HOUR, type DayLook } from '../lib/clock';
 import { norm, type V3 } from '../lib/wings';
@@ -54,7 +54,7 @@ import { ButterflyArt, ButterflyRig, TulipArt, TulipRig, TULIP_TOP, TULIP_HEAD }
 import { AnimalArt, AnimalRig, ANIMAL_FEET } from '../components/Animals';
 import { Note, type NoteHandle } from '../components/Note';
 import { FairyArt, FairyRig, FAIRIES } from '../components/Fairy';
-import { loadedPictures, loadedFilm, loadedBirdsong, onProgress, progress, type Pictures } from '../lib/preload';
+import { loadedPictures, loadedFilm, loadedBirdsong, loadedFlowerSong, onProgress, progress, type Pictures } from '../lib/preload';
 import './busstop.css';
 
 const PIC_W = 1611, PIC_H = 906;
@@ -250,7 +250,9 @@ export function BusStop({ flying, entered }: Props) {
   const actors = useRef<Actor[]>(CARDS.map(() => ({
     mode: 'off', x: 0, y: 0, size: 0, jx: 0, jy: 0, lean: 0, squash: 0, head: 0, footL: 0, footR: 0, offer: 0, clip: false, dust: -1,
   }))).current;
-  const sounds = useRef<{ rain?: LiveSound; wind?: LiveSound; crickets?: LiveSound; birdsong?: HTMLAudioElement }>({}).current;
+  const sounds = useRef<{ rain?: LiveSound; wind?: LiveSound; crickets?: LiveSound; birdsong?: HTMLAudioElement; song?: LiveSound }>({}).current;
+  /** her flowers' song, downloaded and decoded ahead of time */
+  const songPrep = useRef<Promise<AudioBuffer | null> | null>(null);
   const fades = useRef({ birdsong: 0 }).current;
 
   // ── Everything that draws, created once ─────────────────────
@@ -642,6 +644,7 @@ export function BusStop({ flying, entered }: Props) {
       sounds.wind?.stop(0.5);
       sounds.crickets?.stop(0.5);
       sounds.birdsong?.pause();
+      sounds.song?.stop(0.3);
       film.current?.pause();
     };
   }, [S, actors, sounds]);
@@ -723,7 +726,9 @@ export function BusStop({ flying, entered }: Props) {
     // so whichever she chooses has its first flower ready long before the end
     void loadedBirdsong().then(preloadFlowers, preloadFlowers);
     if (skip === 'bouquet') {
-      // (for building: ?scene=bouquet&flower=Lily goes straight to the last gift)
+      // (for building: ?scene=bouquet&flower=Lily goes straight to the last gift; skipping the first page skips
+      //  its tap, so sound wakes on the first tap here instead)
+      window.addEventListener('pointerdown', () => unlockAudio(), { once: true });
       const f = new URLSearchParams(location.search).get('flower');
       await wait(1.5);
       await bouquet(f === 'Lily' || f === 'Lotus' ? f : 'Tulip');
@@ -1141,6 +1146,7 @@ export function BusStop({ flying, entered }: Props) {
     gsap.to(S, { z: 1.05, duration: 8, ease: 'sine.inOut' });
     gsap.to(S, { glow: 1, vignette: 0.5, duration: 3.5, ease: 'sine.inOut' });
     const tune = playMusicBox();
+    songPrep.current ??= loadedFlowerSong().then(prepareSong); // (her flowers' song: decoded while she reads)
     await wait(1.2);
     // fireflies gather into a heart around the full moon
     const { map, ppp, W, H } = mapRef.current;
@@ -1162,6 +1168,17 @@ export function BusStop({ flying, entered }: Props) {
     const { W, H } = mapRef.current;
     void loadFlower(kind); // (normally long since here; the bloom starts either way and waits for any still coming)
     // everything fades into black
+    // her flowers' song begins as the screen goes black (it was downloaded last, after everything else, and is
+    // ready long before now; on a very slow connection it starts when it arrives, unless that's much too late)
+    const blackAt = performance.now();
+    void (songPrep.current ??= loadedFlowerSong().then(prepareSong)).then((buf) => {
+      if (!buf) { songPrep.current = null; return; } // (couldn't be had: no song, and a later try may fetch it again)
+      if (!alive.current || sounds.song || performance.now() - blackAt > 12000) return;
+      sounds.song = playSong(buf, 0.34, 2.5); // (soft: there under everything, never over it)
+    });
+    // the night's crickets fade away under it
+    sounds.crickets?.stop(2.5);
+    sounds.crickets = undefined;
     if (finaleEl.current) gsap.to(finaleEl.current, { autoAlpha: 0, y: -24, duration: 1.2, ease: ease.exit });
     gsap.to(svg.current, { opacity: 0, duration: 1.4, ease: 'sine.inOut' });
     gsap.to('.stop__clock', { autoAlpha: 0, duration: 1.2 });
@@ -1180,8 +1197,9 @@ export function BusStop({ flying, entered }: Props) {
     let blooms = 0;
     bq.onCue = (c) => {
       if (c === 'land') playPop(0.6);
-      else if (c === 'spread') playShimmer(3.4); // (the roots running out to the edges)
-      else if (blooms++ === 0) playShimmer(2.6); else playPop(1.2 + Math.random() * 0.4);
+      else if (c === 'spread') playShimmer(3.4); // (the meadow coming up)
+      else if (blooms++ === 0) playShimmer(2.6);
+      else if (!sounds.song) playPop(1.2 + Math.random() * 0.4); // (with her song playing, the flowers open quietly)
     };
     bouquetRef.current = bq;
     await bq.play().then(live);

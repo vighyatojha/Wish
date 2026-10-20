@@ -19,6 +19,7 @@ import moonUrl from '../assets/moon.webp';
 import morningUrl from '../assets/stop-morning.webp';
 import filmUrl from '../assets/bus-arrives.mp4';
 import birdsongUrl from '../assets/birdsong.m4a';
+import flowerSongUrl from '../assets/flower-song.mp3';
 
 export const PICTURES = { morning: morningUrl, empty: emptyUrl, bus: busUrl, masks: masksUrl, masks2: masks2Url, lamp: lampUrl, moon: moonUrl };
 export type PictureKey = keyof typeof PICTURES;
@@ -116,7 +117,7 @@ function decoded(src: string): Promise<string> {
   });
 }
 
-let started: { pictures: Promise<Pictures>; film: Promise<string>; birdsong: Promise<string> } | null = null;
+let started: { pictures: Promise<Pictures>; film: Promise<string>; birdsong: Promise<string>; flowerSong: Promise<string> } | null = null;
 
 export function preloadStory() {
   if (started) return started;
@@ -126,10 +127,13 @@ export function preloadStory() {
   // the film and the birdsong only start once the pictures are in, so they don't slow them down
   const film = pictures.then(() => download(filmUrl));
   const birdsong = film.then(() => download(birdsongUrl));
-  started = { pictures, film, birdsong };
+  // the song for her flowers comes last of all: it's only needed at the very end, minutes later
+  const flowerSong = birdsong.then(() => download(flowerSongUrl));
+  started = { pictures, film, birdsong, flowerSong };
   return started;
 }
 
 export const loadedPictures = () => preloadStory().pictures;
 export const loadedFilm = () => preloadStory().film;
 export const loadedBirdsong = () => preloadStory().birdsong;
+export const loadedFlowerSong = () => preloadStory().flowerSong;

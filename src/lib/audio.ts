@@ -518,3 +518,59 @@ export function playMusicBox(beat = 0.43): number {
   for (const [n, at] of bass) pluck(N[n], t0 + beat * (1 + at), 0.07, 2.4);
   return t - t0 + 1.5;
 }
+
+// ── A recorded song (her flowers' song): decoded ahead of time, played through the same sound switch ──
+const decoded = new Map<string, Promise<AudioBuffer | null>>();
+/** Downloads (if needed) and decodes a song so it can start the instant it's wanted. */
+export function prepareSong(url: string): Promise<AudioBuffer | null> {
+  if (!ctx) return Promise.resolve(null);
+  const ac = ctx;
+  if (!decoded.has(url)) {
+    decoded.set(url, fetch(url)
+      .then((r) => r.arrayBuffer())
+      .then((b) => new Promise<AudioBuffer>((res, rej) => { void ac.decodeAudioData(b, res, rej)?.catch?.(rej); }))
+      .catch(() => { decoded.delete(url); return null; }));
+  }
+  return decoded.get(url)!;
+}
+/** Plays a decoded song softly in the background, fading in, and looping for as long as it's wanted:
+ *  each time round, the next play starts a few seconds before the last one ends and the two cross-fade,
+ *  so there's never a jump or a gap. Returns a handle to fade it out. */
+export function playSong(buf: AudioBuffer, level = 0.35, fadeIn = 2.5, xfade = 3): LiveSound {
+  if (!ctx || !master) return silent;
+  const ac = ctx;
+  if (ac.state === 'suspended') void ac.resume();
+  const out = new GainNode(ac, { gain: level });
+  out.connect(master);
+  const dur = buf.duration, overlap = Math.min(xfade, dur / 4);
+  const live: AudioBufferSourceNode[] = [];
+  let timer = 0, stopped = false;
+  const play = (at: number, rise: number) => {
+    const g = new GainNode(ac, { gain: 0 });
+    const src = new AudioBufferSourceNode(ac, { buffer: buf });
+    src.connect(g).connect(out);
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(1, at + rise);
+    g.gain.setValueAtTime(1, at + dur - overlap);
+    g.gain.linearRampToValueAtTime(0, at + dur);
+    src.start(at);
+    live.push(src);
+    src.onended = () => { const i = live.indexOf(src); if (i >= 0) live.splice(i, 1); };
+    // (the next one is set up a moment before it's due)
+    const next = at + dur - overlap;
+    timer = window.setTimeout(() => { if (!stopped) play(next, overlap); }, Math.max(0, (next - ac.currentTime - 1) * 1000));
+  };
+  play(ac.currentTime + 0.05, fadeIn);
+  return {
+    setLevel(v: number) { out.gain.setTargetAtTime(clamp01(v) * level, ac.currentTime, 0.3); },
+    stop(fade = 1.5) {
+      stopped = true;
+      clearTimeout(timer);
+      const now = ac.currentTime;
+      out.gain.cancelScheduledValues(now);
+      out.gain.setValueAtTime(out.gain.value, now);
+      out.gain.linearRampToValueAtTime(0, now + fade);
+      for (const src of live) { try { src.stop(now + fade + 0.05); } catch { /* already stopped */ } }
+    },
+  };
+}
