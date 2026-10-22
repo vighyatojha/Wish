@@ -47,13 +47,47 @@ export const content = {
     continueHint: 'Tap anywhere to continue',
   },
 
-  // Tapping the moon at night (no hint here either) shows this.
-  // A placeholder: replace it with your own reason.
-  moon: {
-    title: 'Why is the moon here?',
-    meaning:
-      'Because tonight it is full, just like this day. However dark it gets, something keeps shining for you, and it always comes back, night after night.',
+  // Hidden messages: tapping these in the scene (there's no hint that she can) shows a little card.
+  // Each tap on the same thing shows its next line, round and round.
+  // PLACEHOLDERS: replace the lines with your own (as many as you like for each).
+  secrets: {
     close: 'tap anywhere to close',
+    // the moon (at night)
+    moon: {
+      title: 'A note from the moon',
+      lines: [
+        'Even on the darkest night, there is always some light left. Keep looking up.',
+        'You don\'t have to be full every night to shine. Every phase of you is enough.',
+        'I come back every night, without fail. Keep showing up for yourself the same way.',
+      ],
+    },
+    // the stars (tap the night sky anywhere)
+    stars: {
+      title: 'Written in the stars',
+      lines: [
+        'The stars were here long before us. Your dreams are allowed to be that big.',
+        'A star doesn\'t compete with the others; it just shines. So can you.',
+        'Some of the light you see tonight left its star years ago. Nothing good you do is ever wasted.',
+      ],
+    },
+    // a glowing firefly (at dusk and at night)
+    fireflies: {
+      title: 'A firefly whispers',
+      lines: [
+        'Small lights matter. You don\'t have to light up the whole sky to make the night beautiful.',
+        'I make my own light. You can too, one small step at a time.',
+        'The dark is where little lights are noticed most. Your hard days will show how bright you are.',
+      ],
+    },
+    // the street lamp (any time of day)
+    lamp: {
+      title: 'The lamp by the bus stop',
+      lines: [
+        'I stand here every night so no one waits in the dark. Be that light for someone today.',
+        'Even a lamp needs a moment to warm up. Be patient with yourself.',
+        'I don\'t light the whole road, just the next few steps. That\'s all you need to keep going.',
+      ],
+    },
   },
 
   // Tapping a bird in the sky (there is no hint that she can) shows this.

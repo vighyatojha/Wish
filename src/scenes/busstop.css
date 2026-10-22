@@ -206,6 +206,15 @@
 /* the moon's note: night colours */
 .stop__birdcard--moon { color: #eef0ff; background: rgba(22, 28, 58, 0.9); box-shadow: 0 0 0 1px rgba(200, 210, 255, 0.35), 0 0 40px rgba(170, 190, 255, 0.25), 0 14px 32px rgba(0, 0, 0, 0.45); }
 .stop__birdcard--moon em { color: #aab2d8; }
+/* the stars: the same night blue, a little more silver */
+.stop__birdcard--stars { color: #f2f4ff; background: rgba(16, 20, 44, 0.92); box-shadow: 0 0 0 1px rgba(220, 228, 255, 0.4), 0 0 46px rgba(200, 215, 255, 0.22), 0 14px 32px rgba(0, 0, 0, 0.45); }
+.stop__birdcard--stars em { color: #b4bbdc; }
+/* a firefly: dark, with its yellow-green glow */
+.stop__birdcard--fireflies { color: #f5ffe0; background: rgba(18, 30, 20, 0.9); box-shadow: 0 0 0 1px rgba(210, 255, 140, 0.4), 0 0 44px rgba(190, 255, 110, 0.25), 0 14px 32px rgba(0, 0, 0, 0.45); }
+.stop__birdcard--fireflies em { color: #b9cf98; }
+/* the lamp: its warm light */
+.stop__birdcard--lamp { color: #3a2a12; background: rgba(255, 240, 205, 0.96); box-shadow: 0 0 0 1.5px rgba(200, 140, 40, 0.45), 0 0 48px rgba(255, 196, 90, 0.4), 0 14px 32px rgba(0, 0, 0, 0.35); }
+.stop__birdcard--lamp em { color: #8a7350; }
 
 /* wide screens: the question sits to the left, clear of the moon, the lamp and the animals */
 @media (min-aspect-ratio: 21/20) {

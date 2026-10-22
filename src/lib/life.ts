@@ -234,6 +234,13 @@ export class Life {
   /** Where the birds are on screen (for testing). */
   get birdSpots(): [number, number][] { return this.birds.filter((b) => b.sx > 20 && b.sx < this.W - 20).map((b) => [b.sx, b.sy]); }
 
+  /** where the glowing fireflies were last frame (screen px), for taps */
+  private lit: { x: number; y: number; r: number }[] = [];
+  /** Is there a glowing firefly under this point (screen px)? */
+  hitFirefly(x: number, y: number): boolean {
+    return this.lit.some((l) => Math.hypot(l.x - x, l.y - y) < l.r);
+  }
+
   /** Is there a bird under this point (screen px)? */
   hitBird(x: number, y: number): boolean {
     return this.birds.some((b) => Math.hypot(b.sx - x, b.sy - y) < Math.max(30, b.size * 0.9));
@@ -248,6 +255,7 @@ export class Life {
     }
 
     // ── fireflies: far specks and nearer glows (behind the characters) ──
+    this.lit.length = 0;
     if (this.amount.fireflies > 0.01) {
       g.globalCompositeOperation = 'lighter';
       for (const ff of this.fireflies) {
@@ -269,6 +277,7 @@ export class Life {
         g.fillStyle = '#fbffe0';
         const core = 0.8 + ff.depth * 1.6;
         g.fillRect(sx * W - core / 2, sy * H - core / 2, core, core);
+        if (a > 0.35) this.lit.push({ x: sx * W, y: sy * H, r: Math.max(32, s * 1.5) });
       }
       g.globalCompositeOperation = 'source-over';
       g.globalAlpha = 1;

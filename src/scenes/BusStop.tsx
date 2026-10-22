@@ -44,7 +44,7 @@ import { TypeGarden } from '../lib/typegarden';
 import { saveResponse } from '../lib/firebase';
 import { Fog } from '../lib/fog';
 import { Rain } from '../lib/rain';
-import { Stage, DOOR, MOON, MOON_R } from '../lib/stage';
+import { Stage, DOOR, MOON, MOON_R, LAMP } from '../lib/stage';
 import { Life } from '../lib/life';
 import { Banner, type BannerBird } from '../lib/bunting';
 import { dissolveNoise } from '../lib/dissolve';
@@ -58,6 +58,16 @@ import { loadedPictures, loadedFilm, loadedBirdsong, loadedFlowerSong, onProgres
 import './busstop.css';
 
 const PIC_W = 1611, PIC_H = 906;
+
+// ── the hidden messages ──
+type SecretKind = 'moon' | 'stars' | 'fireflies' | 'lamp' | 'birds';
+/** how many times she has opened each one (each tap shows its next line) */
+const secretSeen: Record<SecretKind, number> = { moon: 0, stars: 0, fireflies: 0, lamp: 0, birds: 0 };
+function secretText(kind: SecretKind, n: number): { title: string; line: string } {
+  if (kind === 'birds') return { title: content.birds.title, line: content.birds.meaning };
+  const s = content.secrets[kind];
+  return { title: s.title, line: s.lines[n % s.lines.length] };
+}
 const ASPECT_INV = PIC_H / PIC_W;
 // The part of the picture a narrow phone keeps in view: the shelter, the bus door, the lamp.
 const FOCUS: Vec2 = [0.525, 0.5];
@@ -213,7 +223,7 @@ export function BusStop({ flying, entered }: Props) {
   const [loaded, setLoaded] = useState({ pictures: 0, film: 0 });
   const pics = useRef<Pictures | null>(null);
   const [noteIndex, setNoteIndex] = useState(0);
-  const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', bird: false, moon: false, go: false, finale: false, replay: false, clock: false });
+  const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', secret: null as null | { kind: SecretKind; line: number }, go: false, finale: false, replay: false, clock: false });
   const [muted, setMutedState] = useState(isMuted());
   const clockText = useRef<HTMLSpanElement>(null);
   const clockIcon = useRef<SVGGElement>(null);
@@ -277,7 +287,7 @@ export function BusStop({ flying, entered }: Props) {
     let bannerHidden = false;
     lifeRef.current = life;
     if (skip) (window as unknown as { __life: Life }).__life = life; // for testing the shortcuts
-    if (showDebug) (window as unknown as { __S: typeof S }).__S = S; // (?debug: tests can set the hour)
+    if (showDebug) Object.assign(window, { __S: S, __life: life }); // (?debug: tests can set the hour, find a firefly)
     const rain = new Rain(rainCanvas.current!, undefined, prefersReducedMotion() ? 0.5 : 0.9);
     const tulip = new TulipRig(tulipG.current!);
     const bf = new ButterflyRig(bfG.current!);
@@ -614,18 +624,35 @@ export function BusStop({ flying, entered }: Props) {
     };
     raf = requestAnimationFrame(frame);
 
-    // tapping a bird (there is no hint that she can)
+    // hidden messages: tapping the moon, the stars, a firefly, the lamp or a bird (there is no hint that she can)
     const onSky = (e: PointerEvent) => {
-      if ((e.target as Element | null)?.closest?.('.stop__hud')) return;
+      const el = e.target as Element | null;
+      if (el?.closest?.('.stop__hud, .stop__veil, button')) return;
+      // (never while she's meant to be tapping something else, or once her flowers have the screen)
+      const w8 = waiters.current;
+      if (w8.note || w8.pluck || w8.answer || w8.go || S.blackout) return;
       const { map, ppp, W: w, H: h } = mapRef.current;
+      const x = e.clientX, y = e.clientY;
+      const night = S.night > 3.2;
       const [mx, my] = map(MOON);
-      const onMoon = S.night > 3.2 && Math.hypot(mx * w - e.clientX, my * h - e.clientY) < Math.max(34, MOON_R * ppp * 1.3);
-      const onBird = S.birds * dayLook(S.hour).birds > 0.2 && life.hitBird(e.clientX, e.clientY);
-      if (!onMoon && !onBird) return;
+      const onMoon = night && Math.hypot(mx * w - x, my * h - y) < Math.max(34, MOON_R * ppp * 1.3);
+      // the lamp is thin: its target is a little wider than it is, so a finger can find it
+      const [lx0, ly0] = map([LAMP.x0, LAMP.y0]), [lx1, ly1] = map([LAMP.x1, LAMP.y1]);
+      const pad = Math.max(18, (lx1 - lx0) * w);
+      const onLamp = x > lx0 * w - pad && x < lx1 * w + pad && y > ly0 * h - pad * 0.5 && y < ly1 * h;
+      const onFirefly = !onLamp && life.hitFirefly(x, y);
+      const onBird = S.birds * dayLook(S.hour).birds > 0.2 && life.hitBird(x, y);
+      // the stars: anywhere in the open night sky (above the shelter's roof)
+      const [, skyY] = map([0.5, 0.34]);
+      const onStars = night && !onMoon && !onLamp && !onBird && y < skyY * h;
+      const kind: SecretKind | null = onMoon ? 'moon' : onLamp ? 'lamp' : onFirefly ? 'fireflies' : onBird ? 'birds' : onStars ? 'stars' : null;
+      if (!kind) return;
       e.stopPropagation();
       e.preventDefault();
       buzz(10);
-      setUi((u) => ({ ...u, bird: onBird && !onMoon, moon: onMoon }));
+      playChime();
+      const line = secretSeen[kind]++;
+      setUi((u) => ({ ...u, secret: { kind, line } }));
     };
     window.addEventListener('pointerdown', onSky, true);
 
@@ -1338,12 +1365,12 @@ export function BusStop({ flying, entered }: Props) {
       )}
 
       {/* tapping a bird, or the moon */}
-      {(ui.bird || ui.moon) && (
-        <button type="button" className="layer stop__veil" onPointerDown={() => setUi((u) => ({ ...u, bird: false, moon: false }))}>
-          <span className={`stop__birdcard${ui.moon ? ' stop__birdcard--moon' : ''}`} role="note">
-            <strong>{ui.moon ? content.moon.title : content.birds.title}</strong>
-            <span>{ui.moon ? content.moon.meaning : content.birds.meaning}</span>
-            <em>{ui.moon ? content.moon.close : content.birds.close}</em>
+      {ui.secret && (
+        <button type="button" className="layer stop__veil" onPointerDown={() => setUi((u) => ({ ...u, secret: null }))}>
+          <span className={`stop__birdcard stop__birdcard--${ui.secret.kind}`} role="note">
+            <strong>{secretText(ui.secret.kind, ui.secret.line).title}</strong>
+            <span>{secretText(ui.secret.kind, ui.secret.line).line}</span>
+            <em>{content.secrets.close}</em>
           </span>
         </button>
       )}
