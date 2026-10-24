@@ -150,8 +150,8 @@ export const content = {
     back: 'Back',
     close: 'Close',
     // part 1: the hidden messages she didn't find
-    missedTitle: 'First… you missed a few things 🤭',
-    missedText: 'There were little messages hidden in the scene. Tap one to read it here:',
+    missedTitle: 'First… you missed a few little things 🤭',
+    missedText: 'There were a few hidden messages tucked away in the scene. Tap one to read it here:',
     foundAll: 'You found every hidden message! Nothing gets past you. 🎉',
     hidden: {
       moon: '🌙 The moon',
@@ -162,26 +162,26 @@ export const content = {
     },
     // part 2: what it all meant (each one shows its part of the picture)
     steps: [
-      { at: 'stop', title: 'This whole place is your life', text: 'And you are the bus stop. Life keeps moving around you: different times, seasons and people. You stand through all of it, and see it all.' },
-      { at: 'sky', title: '☁️ The sky is your mind', text: 'Endless, with no limits. The birds are your thoughts: white ones good, black ones bad. You don’t have to chase every bird that flies by.' },
-      { at: 'clouds', title: '☁️ The clouds are your dreams', text: 'Your dreams and goals. Work hard for them before the chance drifts away, one small step at a time. 🌱' },
-      { at: 'bus', title: '🚌 The buses are people', text: 'Everyone who comes into your life. Some stay long, some only for a short ride, and each one leaves something behind.' },
-      { at: 'door', title: '📜 The scrolls are their words', text: 'Sometimes wishes and kind thoughts: keep those close. Sometimes negativity: you don’t have to signal that bus to stop.' },
-      { at: 'lamp', title: '🏮 The lamp is your forever people', text: 'Bauji, Mummy, your brother, Raavi and Vedika. They keep a light on for you in the dark, until the new morning comes.' },
-      { at: 'moon', title: '🌙 The moon is who stays in hard times', text: 'The people who make your nights beautiful, not scary. Sometimes they come a little late, but they always come.' },
-      { at: 'fireflies', title: '✨ The fireflies are the little lights', text: 'A message, a laugh, a check-in at the right time. The lamp, the moon and the fireflies are the people who always come for you.' },
-      { at: 'colours', title: '💛 And today, I’m the bus that came to wish you', text: 'Its colours are what I wanted you to feel:' },
+      { at: 'stop', title: 'This whole place is your life', text: 'And you are the bus stop. Life keeps moving around us, through different times, situations and seasons, and just like this little stop, you stay, take it all in, and keep going. 🚏' },
+      { at: 'sky', title: '☁️ The sky is your mind', text: 'It’s endless, with no limit to how far it can go. The birds flying across it are your thoughts: the white ones are the good ones, the black ones are the worries. You don’t have to chase every bird; some are better left to fly away. 🕊️' },
+      { at: 'clouds', title: '☁️ The clouds are your dreams', text: 'They’re the dreams and goals you hope to reach with your hard work. Time keeps moving, just like the clouds, so keep going after them, one small step at a time, before the chance drifts away. 🌱' },
+      { at: 'bus', title: '🚌 The buses are the people in your life', text: 'Every bus that stops here is someone who comes into your life. Some stay for a long journey, some only for a short ride, and each of them leaves a little something behind.' },
+      { at: 'door', title: '📜 The scrolls are the words they bring', text: 'Sometimes they’re kind wishes and good thoughts; please keep those close to your heart. And sometimes they’re negativity and harsh words; for those, you don’t have to signal the bus to stop. 🌼' },
+      { at: 'lamp', title: '🏮 The lamp is your forever people', text: 'Your Bauji, Mummy, your brother, Raavi and Vedika. Just like this lamp, they keep a light on for you in the dark, and give you hope until the new morning comes. ❤️' },
+      { at: 'moon', title: '🌙 The moon is the people who stand by you', text: 'They’re the ones who support you through your hard times and make your nights beautiful, not scary. Sometimes they come a little late, but they always come for you.' },
+      { at: 'fireflies', title: '✨ The fireflies are the little lights', text: 'A kind message, a shared laugh, a check-in at just the right moment. The lamp, the moon and the fireflies are all the people who always come for you, each in their own way.' },
+      { at: 'colours', title: '💛 And today, I’m the bus that came to wish you', text: 'Its colours carry what I hoped you would feel:' },
     ],
     colours: [
-      ['#f2c230', 'Yellow', 'joy, warmth, sunshine'],
-      ['#4caf50', 'Green', 'hope, fresh starts, growth'],
+      ['#f2c230', 'Yellow', 'joy, warmth and sunshine'],
+      ['#4caf50', 'Green', 'hope, fresh starts and growth'],
       ['#3a8fd0', 'Blue', 'calm and trust'],
       ['#7cc26a', 'The leaf', 'a new chapter'],
     ],
-    thanks: 'I hope you felt at least one of them. Thank you, and have a lovely day! 💛',
+    thanks: 'I tried my best to make you feel at least one of these. Thank you for being here, and I hope you have a lovely day! 💛',
     // the little note at the very end ({n}: how many hidden messages she missed)
-    psMissed: 'P.S. Btw, you missed {n} hidden things along the way 🤭 Picture abhi baaki hai! 💫',
-    psFound: 'P.S. You found every hidden thing. Picture abhi baaki hai! 💫',
+    psMissed: 'P.S. By the way, you missed {n} hidden things along the way 🤭 Picture abhi baaki hai! 💫',
+    psFound: 'P.S. You found every hidden thing along the way. Picture abhi baaki hai! 💫',
   },
 
   // The small round button in the corner
