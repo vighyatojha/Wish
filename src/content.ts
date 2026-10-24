@@ -138,6 +138,50 @@ export const content = {
     flowersComing: 'her flowers are on their way…',
   },
 
+  // The last screen: he appears as a guide (a crumpled paper that unfolds into him) and tells her
+  // what she missed, and what everything in the scene meant.
+  meaning: {
+    invite: 'Psst… there’s a little story hidden in all of this. Want to see it?',
+    inviteButton: 'Show me',
+    signature: '~ the bus that came to wish you',
+    next: 'Next',
+    back: 'Back',
+    close: 'Close',
+    // part 1: the hidden messages she didn't find
+    missedTitle: 'First… you missed a few things 🤭',
+    missedText: 'There were little messages hidden in the scene. Tap one to read it here:',
+    foundAll: 'You found every hidden message! Nothing gets past you. 🎉',
+    hidden: {
+      moon: '🌙 The moon',
+      stars: '⭐ The stars',
+      fireflies: '✨ The fireflies',
+      lamp: '🏮 The lamp',
+      birds: '🕊️ The birds',
+    },
+    // part 2: what it all meant (each one shows its part of the picture)
+    steps: [
+      { at: 'stop', title: 'This whole place is your life', text: 'And you are the bus stop. Life keeps moving around you: different times, seasons and people. You stand through all of it, and see it all.' },
+      { at: 'sky', title: '☁️ The sky is your mind', text: 'Endless, with no limits. The birds are your thoughts: white ones good, black ones bad. You don’t have to chase every bird that flies by.' },
+      { at: 'clouds', title: '☁️ The clouds are your dreams', text: 'Your dreams and goals. Work hard for them before the chance drifts away, one small step at a time. 🌱' },
+      { at: 'bus', title: '🚌 The buses are people', text: 'Everyone who comes into your life. Some stay long, some only for a short ride, and each one leaves something behind.' },
+      { at: 'door', title: '📜 The scrolls are their words', text: 'Sometimes wishes and kind thoughts: keep those close. Sometimes negativity: you don’t have to signal that bus to stop.' },
+      { at: 'lamp', title: '🏮 The lamp is your forever people', text: 'Bauji, Mummy, your brother, Raavi and Vedika. They keep a light on for you in the dark, until the new morning comes.' },
+      { at: 'moon', title: '🌙 The moon is who stays in hard times', text: 'The people who make your nights beautiful, not scary. Sometimes they come a little late, but they always come.' },
+      { at: 'fireflies', title: '✨ The fireflies are the little lights', text: 'A message, a laugh, a check-in at the right time. The lamp, the moon and the fireflies are the people who always come for you.' },
+      { at: 'colours', title: '💛 And today, I’m the bus that came to wish you', text: 'Its colours are what I wanted you to feel:' },
+    ],
+    colours: [
+      ['#f2c230', 'Yellow', 'joy, warmth, sunshine'],
+      ['#4caf50', 'Green', 'hope, fresh starts, growth'],
+      ['#3a8fd0', 'Blue', 'calm and trust'],
+      ['#7cc26a', 'The leaf', 'a new chapter'],
+    ],
+    thanks: 'I hope you felt at least one of them. Thank you, and have a lovely day! 💛',
+    // the little note at the very end ({n}: how many hidden messages she missed)
+    psMissed: 'P.S. Btw, you missed {n} hidden things along the way 🤭 Picture abhi baaki hai! 💫',
+    psFound: 'P.S. You found every hidden thing. Picture abhi baaki hai! 💫',
+  },
+
   // The small round button in the corner
   sound: { mute: 'Turn sound off', unmute: 'Turn sound on' },
 } as const;

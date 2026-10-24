@@ -52,6 +52,8 @@ import { coverLayout, toScreen, toPicture, type CoverLayout, type Vec2 } from '.
 import { GrainPattern, blinker } from '../components/CuteBird';
 import { ButterflyArt, ButterflyRig, TulipArt, TulipRig, TULIP_TOP, TULIP_HEAD } from '../components/Garden';
 import { AnimalArt, AnimalRig, ANIMAL_FEET } from '../components/Animals';
+import { Meaning, preloadMeaning } from '../components/Meaning';
+import guideUrl from '../assets/guide.webp';
 import { Note, type NoteHandle } from '../components/Note';
 import { FairyArt, FairyRig, FAIRIES } from '../components/Fairy';
 import { loadedPictures, loadedFilm, loadedBirdsong, loadedFlowerSong, onProgress, progress, type Pictures } from '../lib/preload';
@@ -225,7 +227,7 @@ export function BusStop({ flying, entered }: Props) {
   const [loaded, setLoaded] = useState({ pictures: 0, film: 0 });
   const pics = useRef<Pictures | null>(null);
   const [noteIndex, setNoteIndex] = useState(0);
-  const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', secret: null as null | { kind: SecretKind; line: number }, go: false, finale: false, replay: false, clock: false });
+  const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', secret: null as null | { kind: SecretKind; line: number }, go: false, finale: false, replay: false, clock: false, invite: false, meaning: false });
   const [muted, setMutedState] = useState(isMuted());
   const clockText = useRef<HTMLSpanElement>(null);
   const clockIcon = useRef<SVGGElement>(null);
@@ -759,6 +761,8 @@ export function BusStop({ flying, entered }: Props) {
       //  its tap, so sound wakes on the first tap here instead)
       window.addEventListener('pointerdown', () => unlockAudio(), { once: true });
       const f = new URLSearchParams(location.search).get('flower');
+      // (…and ?scene=bouquet&meaning opens the very last screen, the story behind it all)
+      if (new URLSearchParams(location.search).has('meaning')) { S.blackout = true; preloadMeaning(); setUi((u) => ({ ...u, meaning: true })); return; }
       await wait(1.5);
       await bouquet(f === 'Lily' || f === 'Lotus' ? f : 'Tulip');
       return;
@@ -1196,6 +1200,7 @@ export function BusStop({ flying, entered }: Props) {
   async function bouquet(kind: FlowerKind) {
     const { W, H } = mapRef.current;
     void loadFlower(kind); // (normally long since here; the bloom starts either way and waits for any still coming)
+    preloadMeaning(); // (the last screen's pictures: small, and needed in a minute or so)
     // everything fades into black
     // her flowers' song begins as the screen goes black (it was downloaded last, after everything else, and is
     // ready long before now; on a very slow connection it starts when it arrives, unless that's much too late)
@@ -1247,6 +1252,9 @@ export function BusStop({ flying, entered }: Props) {
     tg.opts.caret = false;
     await wait(3);
     setUi((u) => ({ ...u, replay: true }));
+    // a moment later, he offers to tell her the story behind it all
+    await wait(2.5);
+    setUi((u) => ({ ...u, invite: true }));
   }
 
   const flowers = useMemo(() => ({
@@ -1417,6 +1425,23 @@ export function BusStop({ flying, entered }: Props) {
       <div ref={bouquetVeil} className="layer stop__bq-veil" aria-hidden="true" />
       <canvas ref={bouquetCanvas} className="layer stop__bouquet" aria-hidden="true" />
       <canvas ref={gardenCanvas} className="stop__garden" aria-label={content.finale.gardenWords} role="img" />
+      {ui.invite && !ui.meaning && (
+        <div className="stop__invite" role="note">
+          <img src={guideUrl} alt="" />
+          <p>
+            <span>{content.meaning.invite}</span>
+            <button type="button" onClick={() => setUi((u) => ({ ...u, meaning: true }))}>{content.meaning.inviteButton} ✨</button>
+          </p>
+        </div>
+      )}
+      {ui.meaning && (
+        <Meaning
+          found={{ ...secretSeen }}
+          read={(k) => secretText(k, 0)}
+          onClose={() => setUi((u) => ({ ...u, meaning: false }))}
+          onReplay={() => location.assign(location.pathname)}
+        />
+      )}
       {ui.replay && (
         <button type="button" className="stop__replay" onClick={() => location.assign(location.pathname)}>{content.finale.replay}</button>
       )}

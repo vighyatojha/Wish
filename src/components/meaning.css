@@ -1,0 +1,223 @@
+/* ── the last screen: the story behind the surprise ── */
+@property --sx { syntax: '<length>'; inherits: false; initial-value: 50vw; }
+@property --sy { syntax: '<length>'; inherits: false; initial-value: 50vh; }
+@property --sr { syntax: '<length>'; inherits: false; initial-value: 150vmax; }
+
+.meaning {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: hidden;
+  background: #04060f;
+  color: #2b2a33;
+  animation: meaning-in 1s ease both;
+}
+@keyframes meaning-in { from { opacity: 0; } }
+
+.meaning__bg, .meaning__bg img, .meaning__spot { position: absolute; left: 0; top: 0; }
+.meaning__bg { inset: 0; }
+.meaning__bg img {
+  width: 1600px;
+  height: 900px;
+  max-width: none;
+  transform-origin: 0 0;
+  transition: transform 1.7s cubic-bezier(0.45, 0.05, 0.25, 1), opacity 1.3s ease;
+  user-select: none;
+}
+/* a soft pool of light on what he's talking about; the rest dims */
+.meaning__spot {
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--sx) var(--sy), rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) var(--sr), rgba(4, 6, 18, 0.6) calc(var(--sr) * 1.9));
+  transition: --sx 1.7s cubic-bezier(0.45, 0.05, 0.25, 1), --sy 1.7s cubic-bezier(0.45, 0.05, 0.25, 1), --sr 1.7s ease;
+}
+
+/* the sky's thoughts: white birds and black birds */
+.meaning__birds { position: absolute; inset: 0 0 50% 0; pointer-events: none; }
+.meaning__bird {
+  position: absolute;
+  left: -8vw;
+  width: clamp(26px, 3.4vw, 46px);
+  fill: #fbfbff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+  animation: meaning-fly 10s linear infinite, meaning-flap 0.5s ease-in-out infinite alternate;
+}
+.meaning__bird.is-dark { fill: #20222c; filter: none; }
+@keyframes meaning-fly { to { transform: translate(118vw, -4vh); } }
+@keyframes meaning-flap { to { scale: 1 0.45; } }
+
+/* a bunny by the bus door, with its scroll */
+.meaning__bunny { position: absolute; translate: -50% -96%; overflow: visible; animation: meaning-hop 0.8s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes meaning-hop { from { opacity: 0; translate: -50% -70%; } }
+
+.meaning__x {
+  all: unset;
+  position: absolute;
+  z-index: 3;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(14px + env(safe-area-inset-right));
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  font: 400 1.7rem / 1 'Patrick Hand', cursive;
+  color: #fff;
+  background: rgba(10, 14, 30, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.meaning__x:focus-visible { outline: 2px solid #ffd98a; outline-offset: 2px; }
+
+/* him and his words, at the bottom */
+.meaning__dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+  padding: 0 max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  pointer-events: none;
+}
+.meaning__dock > * { pointer-events: auto; }
+
+/* ── the guide: a ball of paper that unfolds into him (three panels, like a folded letter) ── */
+.meaning__guide {
+  position: relative;
+  flex: none;
+  height: min(52svh, 440px);
+  aspect-ratio: 620 / 735;
+  perspective: 1100px;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
+  margin-bottom: -2px;
+}
+.meaning__ball { position: absolute; inset: 6% 8%; width: 84%; height: 88%; object-fit: contain; }
+.meaning__fold {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 33.34%;
+  transform-style: preserve-3d;
+}
+.meaning__fold--0 { top: 0; transform-origin: 50% 100%; }
+.meaning__fold--1 { top: 33.33%; }
+.meaning__fold--2 { top: 66.66%; transform-origin: 50% 0; }
+.meaning__face, .meaning__back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background-size: 100% 300%;
+  background-repeat: no-repeat;
+}
+.meaning__fold--0 .meaning__face { background-position: 0 0; }
+.meaning__fold--1 .meaning__face { background-position: 0 50%; }
+.meaning__fold--2 .meaning__face { background-position: 0 100%; }
+/* the back of each panel: plain paper, the shape of the picture */
+.meaning__back {
+  transform: rotateX(180deg);
+  background: linear-gradient(170deg, #fbf8f1, #e9e4d8);
+  -webkit-mask-size: 100% 300%;
+  mask-size: 100% 300%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+.meaning__fold--0 .meaning__back { -webkit-mask-position: 0 0; mask-position: 0 0; }
+.meaning__fold--2 .meaning__back { -webkit-mask-position: 0 100%; mask-position: 0 100%; }
+/* the creases fade once he's unfolded */
+.meaning__crease { position: absolute; left: 6%; right: 6%; height: 10px; pointer-events: none; }
+.meaning__fold--0 .meaning__crease { bottom: 0; background: linear-gradient(to top, rgba(60, 40, 20, 0.22), transparent); }
+.meaning__fold--2 .meaning__crease { top: 0; background: linear-gradient(to bottom, rgba(60, 40, 20, 0.22), transparent); }
+
+/* ── his words ── */
+.meaning__bubble {
+  position: relative;
+  flex: 0 1 34rem;
+  margin-bottom: 3svh;
+  padding: 0.9rem 1.2rem 0.8rem;
+  background: rgba(252, 250, 244, 0.97);
+  border-radius: 18px;
+  box-shadow: 0 0 0 1.5px rgba(60, 50, 40, 0.25), 0 16px 36px rgba(0, 0, 0, 0.4);
+}
+.meaning__bubble::before { /* its tail, towards him */
+  content: '';
+  position: absolute;
+  left: -9px;
+  bottom: 28px;
+  width: 18px;
+  height: 18px;
+  background: inherit;
+  transform: rotate(45deg);
+  box-shadow: -1.5px 1.5px 0 rgba(60, 50, 40, 0.18);
+}
+.meaning__sig { margin: 0 0 0.3rem; font: 600 1.05rem / 1.2 'Dancing Script', cursive; color: #a06a2a; }
+.meaning__words { animation: meaning-words 0.45s ease both; }
+@keyframes meaning-words { from { opacity: 0; transform: translateY(6px); } }
+.meaning__words h2 { margin: 0 0 0.35rem; font: 400 1.4rem / 1.2 'Patrick Hand', cursive; color: #2b2a33; }
+.meaning__words p { margin: 0 0 0.5rem; font: 400 1.15rem / 1.42 'EB Garamond', Georgia, serif; }
+.meaning__typing { display: flex; gap: 6px; height: 1.6rem; align-items: center; margin: 0.3rem 0 0.6rem; }
+.meaning__typing i { width: 8px; height: 8px; border-radius: 50%; background: #b8ab98; animation: meaning-dot 0.9s ease-in-out infinite; }
+.meaning__typing i:nth-child(2) { animation-delay: 0.15s; }
+.meaning__typing i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes meaning-dot { 50% { transform: translateY(-5px); opacity: 0.5; } }
+
+.meaning__chips { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.2rem 0 0.5rem; }
+.meaning__chip {
+  all: unset;
+  padding: 0.3rem 0.8rem 0.35rem;
+  font: 400 1.05rem / 1.2 'Patrick Hand', cursive;
+  background: #f1ebde;
+  border: 1px solid rgba(120, 95, 60, 0.35);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.meaning__chip.is-on { background: #2a3158; color: #f4f1ff; border-color: transparent; }
+.meaning__chip:focus-visible { outline: 2px solid #c58a2e; outline-offset: 2px; }
+.meaning__secret { padding: 0.55rem 0.75rem; background: #f5f0e5; border-radius: 10px; animation: meaning-words 0.35s ease both; }
+.meaning__secret strong { font: 400 1.1rem / 1.2 'Patrick Hand', cursive; display: block; }
+
+.meaning__colours { list-style: none; margin: 0 0 0.5rem; padding: 0; display: grid; gap: 0.25rem; font: 400 1.1rem / 1.35 'EB Garamond', Georgia, serif; }
+.meaning__colours span { display: inline-block; width: 0.9em; height: 0.9em; margin-right: 0.45em; border-radius: 50%; vertical-align: -0.08em; box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.15); }
+.meaning__colours b { font-weight: 500; }
+.meaning__sign { font: 600 1.15rem / 1.3 'Dancing Script', cursive !important; color: #a06a2a; text-align: right; }
+.meaning__ps { font-style: italic; color: #6b6474; }
+
+.meaning__nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem 0.6rem; margin-top: 0.3rem; }
+.meaning__nav button { white-space: nowrap; }
+.meaning__dots { display: flex; gap: 5px; margin-right: auto; }
+.meaning__dots i { width: 6px; height: 6px; border-radius: 50%; background: #d8cfbf; transition: background 0.3s, transform 0.3s; }
+.meaning__dots i.is-on { background: #a06a2a; transform: scale(1.3); }
+.meaning__next, .meaning__back {
+  all: unset;
+  cursor: pointer;
+  font: 400 1.1rem / 1 'Patrick Hand', cursive;
+  padding: 0.45rem 1.05rem 0.5rem;
+  border-radius: 999px;
+}
+.meaning__next { background: #2a3158; color: #fff7e6; }
+.meaning__back { color: #6b6474; }
+.meaning__next:focus-visible, .meaning__back:focus-visible { outline: 2px solid #c58a2e; outline-offset: 2px; }
+
+/* an upright phone: he stands on the left, just above his words, which take the width */
+@media (max-aspect-ratio: 1/1) {
+  .meaning__dock { flex-direction: column; align-items: stretch; gap: 0; }
+  .meaning__guide { height: min(30svh, 300px); align-self: flex-start; margin: 0 0 -1.2rem 2vw; z-index: 1; }
+  .meaning__bubble { flex: none; margin-bottom: 0; padding-top: 1.1rem; }
+  .meaning__bubble::before { left: 24px; top: -8px; bottom: auto; }
+  .meaning__words p { font-size: 1.08rem; }
+}
+/* a phone held sideways: everything a little smaller */
+@media (orientation: landscape) and (max-height: 520px) {
+  .meaning__guide { height: 70svh; }
+  .meaning__bubble { margin-bottom: 2svh; padding: 0.6rem 0.9rem 0.6rem; }
+  .meaning__words h2 { font-size: 1.15rem; }
+  .meaning__words p, .meaning__colours { font-size: 0.98rem; line-height: 1.32; }
+  .meaning__sig { font-size: 0.95rem; margin-bottom: 0.15rem; }
+  .meaning__bubble { flex-basis: 42rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .meaning__bg img, .meaning__spot { transition-duration: 0.01s; }
+  .meaning__bird { animation: none; display: none; }
+}
