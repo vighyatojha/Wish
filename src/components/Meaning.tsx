@@ -254,7 +254,6 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
                   <p className="book__caption book__caption--on">{M.thanks}</p>
                 </Panel>
                 <div className="book__balloon">
-                  <p className="book__sign">{M.signature}</p>
                   <p className="book__ps">{n ? M.psMissed.replace('{n}', String(n)) : M.psFound}</p>
                 </div>
               </>
