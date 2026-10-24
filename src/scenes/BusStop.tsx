@@ -53,7 +53,7 @@ import { GrainPattern, blinker } from '../components/CuteBird';
 import { ButterflyArt, ButterflyRig, TulipArt, TulipRig, TULIP_TOP, TULIP_HEAD } from '../components/Garden';
 import { AnimalArt, AnimalRig, ANIMAL_FEET } from '../components/Animals';
 import { Meaning, preloadMeaning } from '../components/Meaning';
-import { StoryButton } from '../components/StoryButton';
+import { StoryButton, guideReady } from '../components/StoryButton';
 import { rememberEnd } from '../lib/storyMemory';
 import { Note, type NoteHandle } from '../components/Note';
 import { FairyArt, FairyRig, FAIRIES } from '../components/Fairy';
@@ -765,7 +765,7 @@ export function BusStop({ flying, entered }: Props) {
       // (…and ?scene=bouquet&meaning opens the very last screen, the story behind it all)
       if (new URLSearchParams(location.search).has('meaning')) { S.blackout = true; preloadMeaning(); setUi((u) => ({ ...u, meaning: true })); return; }
       // (…and ?scene=bouquet&ask, his picture popping up to ask)
-      if (new URLSearchParams(location.search).has('ask')) { S.blackout = true; preloadMeaning(); setUi((u) => ({ ...u, replay: true, ask: true })); return; }
+      if (new URLSearchParams(location.search).has('ask')) { S.blackout = true; preloadMeaning(); await guideReady(); setUi((u) => ({ ...u, replay: true, ask: true })); return; }
       await wait(1.5);
       await bouquet(f === 'Lily' || f === 'Lotus' ? f : 'Tulip');
       return;
@@ -1261,6 +1261,7 @@ export function BusStop({ flying, entered }: Props) {
     await bq.settled.then(live);
     await wait(Math.max(1, (songEnds + 5000 - performance.now()) / 1000));
     rememberEnd({ ...secretSeen }); // (so on her next visit, he can offer her the story straight away)
+    await guideReady().then(live);  // (his picture is long since here; this just makes sure)
     setUi((u) => ({ ...u, ask: true }));
   }
 

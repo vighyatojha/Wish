@@ -6,6 +6,17 @@ import guideUrl from '../assets/guide.webp';
 import { content } from '../content';
 import './story-button.css';
 
+/** Resolves once his picture can be shown (or after a while regardless), so he never pops up as an empty note. */
+export function guideReady(ms = 12000): Promise<void> {
+  return new Promise((res) => {
+    const i = new Image();
+    i.onload = i.onerror = () => res();
+    i.src = guideUrl;
+    if (i.complete) res();
+    setTimeout(res, ms);
+  });
+}
+
 interface Props {
   place: 'end' | 'start';
   note: string;
