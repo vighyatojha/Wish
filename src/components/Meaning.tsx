@@ -123,7 +123,6 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
     gsap.set(ball, { autoAlpha: 0, scale: 0.3, rotate: -35, y: -120 });
     gsap.set([...folds, whole, g.parentElement!.querySelector('.book__sig')!], { autoAlpha: 0 });
     gsap.set(folds[0], { rotateX: -178 }); gsap.set(folds[2], { rotateX: 178 });
-    gsap.set(g.querySelectorAll('.book__crease'), { autoAlpha: 1 });
     const tl = gsap.timeline({ delay: 0.25 })
       .to(ball, { autoAlpha: 1, scale: 0.6, rotate: 6, y: 0, duration: 0.65, ease: 'back.out(1.7)' })
       .to(ball, { rotate: -5, duration: 0.09, repeat: 3, yoyo: true, ease: 'sine.inOut' })      // (it crinkles…)
@@ -133,7 +132,6 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
       .set([folds[0], folds[2]], { autoAlpha: 1 })
       .to(folds[0], { rotateX: 0, duration: 0.7, ease: 'power3.out' })                          // the top third unfolds
       .to(folds[2], { rotateX: 0, duration: 0.7, ease: 'power3.out' }, '-=0.35')                // then the bottom
-      .to(g.querySelectorAll('.book__crease'), { autoAlpha: 0, duration: 0.6 }, '-=0.2')
       .set(whole, { autoAlpha: 1 })
       .set(folds, { autoAlpha: 0 })
       .to(g.parentElement!.querySelector('.book__sig'), { autoAlpha: 1, duration: 0.6 }, '-=0.3');
@@ -150,7 +148,6 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
       .to(g.parentElement!.querySelector('.book__sig'), { autoAlpha: 0, duration: 0.2 })
       .set(folds, { autoAlpha: 1 })
       .set(g.querySelector('.book__whole'), { autoAlpha: 0 })
-      .to(g.querySelectorAll('.book__crease'), { autoAlpha: 1, duration: 0.2 })
       .to(folds[2], { rotateX: 178, duration: 0.45, ease: 'power2.in' })
       .to(folds[0], { rotateX: -178, duration: 0.45, ease: 'power2.in' }, '-=0.2')
       .set(folds, { autoAlpha: 0 })
@@ -199,8 +196,7 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
                 {[0, 1, 2].map((i) => (
                   <div key={i} className={`book__fold book__fold--${i}`}>
                     <div className="book__face" style={{ backgroundImage: `url(${guideUrl})` }} />
-                    <div className="book__back" style={{ WebkitMaskImage: `url(${guideUrl})`, maskImage: `url(${guideUrl})` }} />
-                    {i !== 1 && <div className="book__crease" />}
+                    <div className="book__paperback" style={{ WebkitMaskImage: `url(${guideUrl})`, maskImage: `url(${guideUrl})` }} />
                   </div>
                 ))}
               </div>
