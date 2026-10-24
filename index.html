@@ -20,17 +20,39 @@
     <noscript><p style="padding:40px 28px;font:18px Georgia,serif">This birthday page needs JavaScript turned on.</p></noscript>
     <script type="module" src="/src/main.tsx"></script>
     <!-- If this source page is opened through a plain web server (not
-         "npm run dev"), the app can't start. Say so instead of staying blank.
-         This tag is never in the built site (dist), so it only helps here. -->
+         "npm run dev"), the app can't start. (The built site doesn't load
+         /src/main.tsx, so there this does nothing.)
+         • On the published site this page can be served for a minute while an
+           update is going out: say "updating", keep checking, and switch to the
+           real site the moment it's there.
+         • Opened from a folder on a computer: say how to open it properly. -->
     <script>
       setTimeout(function () {
         if (window.__appStarted || !document.querySelector('script[src="/src/main.tsx"]')) return;
-        document.getElementById('root').innerHTML =
+        var root = document.getElementById('root');
+        var local = /^(localhost|127\.|0\.0\.0\.0|\[::1\]|192\.168\.|10\.)/.test(location.hostname) || location.protocol === 'file:';
+        if (!local) {
+          root.innerHTML = '<p class="boot">The page is updating… one moment.</p>';
+          var check = function () {
+            fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' })
+              .then(function (r) { return r.text(); })
+              .then(function (t) {
+                if (t.indexOf('src="/src/main.tsx"') < 0) {
+                  var q = location.search ? location.search + '&' : '?';
+                  location.replace(location.pathname + q + 'v=' + Date.now() + location.hash);
+                } else setTimeout(check, 4000);
+              })
+              .catch(function () { setTimeout(check, 6000); });
+          };
+          check();
+          return;
+        }
+        root.innerHTML =
           '<div style="max-width:34rem;margin:12vh auto;padding:0 28px;font:18px/1.55 Georgia,serif;color:#1c2333">' +
           '<p style="font-size:1.4rem;margin-bottom:1rem">This is the source folder, not the finished site.</p>' +
           '<p style="margin-bottom:1rem">Open the <b>dist</b> folder instead, for example <code>…/birthday-site/dist/</code> on the same server.</p>' +
           '<p>Or, in this folder, run <code>npm run dev</code> and open the address it prints.</p></div>';
-      }, 3000);
+      }, 2500);
     </script>
   </body>
 </html>
