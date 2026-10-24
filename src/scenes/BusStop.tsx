@@ -141,6 +141,8 @@ function sceneLight(look: DayLook, rain: number) {
 }
 const skip = new URLSearchParams(location.search).get('scene');
 const showDebug = new URLSearchParams(location.search).has('debug');
+/** ?keepq: never lower the drawing quality (for still captures on a slow machine) */
+const keepQuality = new URLSearchParams(location.search).has('keepq');
 
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -366,7 +368,7 @@ export function BusStop({ flying, entered }: Props) {
     let fastTime = 0, settleUntil = 0, best = 0;
     const adapt = (rawDt: number, now: number) => {
       // (not while things are still arriving and being set up: those moments are slow once, not always)
-      if (!stageShown || now < settleUntil) return;
+      if (!stageShown || now < settleUntil || keepQuality) return;
       // slower than ~40 frames a second for a while: draw a little coarser, until it keeps up…
       if (rawDt > 1 / 40) { slowFrames++; slowTime += rawDt; fastTime = 0; } else { slowFrames = Math.max(0, slowFrames - 1); fastTime += rawDt; }
       if (slowFrames > 40 && slowTime > 1.2 && quality < QUALITY.length - 1) { best = quality + 1; setQuality(quality + 1); settleUntil = now + 2000; }
