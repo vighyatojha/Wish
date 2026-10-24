@@ -103,61 +103,80 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
   const busy = useRef(false);
 
 
-  // ── it opens: the book swings open, a ball of paper drops onto it and unfolds into him ──
+  // he only appears for the last pages: from "today, I'm the bus that came to wish you" to the end
+  const himFrom = M.steps.findIndex((st) => st.at === 'colours') + 1;
+  const [shown, setShown] = useState(false);
+
+  // ── the book opens: it swings open over her flowers ──
   useLayoutEffect(() => {
-    const g = guide.current!;
-    const ball = g.querySelector('.book__ball')!, folds = g.querySelectorAll('.book__fold');
     const ctx = gsap.context(() => {
-      gsap.set(sheet.current, { autoAlpha: 0 });
-      gsap.set(ball, { autoAlpha: 0, scale: 0.3, rotate: -35, y: -120 });
-      gsap.set(folds, { autoAlpha: 0 });
-      gsap.set(g.querySelector('.book__whole'), { autoAlpha: 0 });
-      gsap.set(folds[0], { rotateX: -178 }); gsap.set(folds[2], { rotateX: 178 });
-      gsap.timeline()
-        .fromTo('.book', { autoAlpha: 0, rotateY: -75, scale: 0.85 }, { autoAlpha: 1, rotateY: 0, scale: 1, duration: 1.1, ease: 'power3.out' })
-        .to(ball, { autoAlpha: 1, scale: 0.6, rotate: 6, y: 0, duration: 0.65, ease: 'back.out(1.7)' }, '-=0.2')
-        .to(ball, { rotate: -5, duration: 0.09, repeat: 3, yoyo: true, ease: 'sine.inOut' })      // (it crinkles…)
-        .to(ball, { scale: 0.9, rotate: 0, duration: 0.4, ease: 'power2.out' })                  // (…and opens out)
-        .to(ball, { autoAlpha: 0, duration: 0.25 })
-        .to(folds[1], { autoAlpha: 1, duration: 0.2 }, '<')
-        .set([folds[0], folds[2]], { autoAlpha: 1 })
-        .to(folds[0], { rotateX: 0, duration: 0.7, ease: 'power3.out' })                          // the top third unfolds
-        .to(folds[2], { rotateX: 0, duration: 0.7, ease: 'power3.out' }, '-=0.35')                // then the bottom
-        .to(g.querySelectorAll('.book__crease'), { autoAlpha: 0, duration: 0.6 }, '-=0.2')
-        .set(g.querySelector('.book__whole'), { autoAlpha: 1 })
-        .set(folds, { autoAlpha: 0 })
-        .to(sheet.current, { autoAlpha: 1, duration: 0.5 }, '-=0.8');
+      gsap.fromTo('.book', { autoAlpha: 0, rotateY: -75, scale: 0.85 }, { autoAlpha: 1, rotateY: 0, scale: 1, duration: 1.1, ease: 'power3.out' });
     }, root);
     return () => ctx.revert();
   }, []);
 
-  // ── turning a page: it swings away from its spine, and the next swings in ──
-  const turn = (to: number) => {
-    if (busy.current || to < 0 || to > last || to === page) return;
-    busy.current = true;
-    const fwd = to > page;
-    gsap.timeline({ onComplete: () => { busy.current = false; } })
-      .to(sheet.current, { rotateY: fwd ? -88 : 88, autoAlpha: 0.2, duration: 0.38, ease: 'power2.in', transformOrigin: fwd ? '0% 50%' : '100% 50%' })
-      .add(() => { setPage(to); setOpen(null); })
-      .fromTo(sheet.current, { rotateY: fwd ? 88 : -88, transformOrigin: fwd ? '100% 50%' : '0% 50%' }, { rotateY: 0, autoAlpha: 1, duration: 0.45, ease: 'power2.out' });
-  };
+  // ── he arrives: a ball of paper drops onto the page, crinkles, opens, and unfolds into him ──
+  useLayoutEffect(() => {
+    if (!shown || !guide.current) return;
+    const g = guide.current;
+    const ball = g.querySelector('.book__ball')!, folds = g.querySelectorAll('.book__fold'), whole = g.querySelector('.book__whole')!;
+    gsap.set(ball, { autoAlpha: 0, scale: 0.3, rotate: -35, y: -120 });
+    gsap.set([...folds, whole, g.parentElement!.querySelector('.book__sig')!], { autoAlpha: 0 });
+    gsap.set(folds[0], { rotateX: -178 }); gsap.set(folds[2], { rotateX: 178 });
+    gsap.set(g.querySelectorAll('.book__crease'), { autoAlpha: 1 });
+    const tl = gsap.timeline({ delay: 0.25 })
+      .to(ball, { autoAlpha: 1, scale: 0.6, rotate: 6, y: 0, duration: 0.65, ease: 'back.out(1.7)' })
+      .to(ball, { rotate: -5, duration: 0.09, repeat: 3, yoyo: true, ease: 'sine.inOut' })      // (it crinkles…)
+      .to(ball, { scale: 0.9, rotate: 0, duration: 0.4, ease: 'power2.out' })                  // (…and opens out)
+      .to(ball, { autoAlpha: 0, duration: 0.25 })
+      .to(folds[1], { autoAlpha: 1, duration: 0.2 }, '<')
+      .set([folds[0], folds[2]], { autoAlpha: 1 })
+      .to(folds[0], { rotateX: 0, duration: 0.7, ease: 'power3.out' })                          // the top third unfolds
+      .to(folds[2], { rotateX: 0, duration: 0.7, ease: 'power3.out' }, '-=0.35')                // then the bottom
+      .to(g.querySelectorAll('.book__crease'), { autoAlpha: 0, duration: 0.6 }, '-=0.2')
+      .set(whole, { autoAlpha: 1 })
+      .set(folds, { autoAlpha: 0 })
+      .to(g.parentElement!.querySelector('.book__sig'), { autoAlpha: 1, duration: 0.6 }, '-=0.3');
+    return () => { tl.kill(); };
+  }, [shown]);
 
-  // ── it closes: he folds back up into paper, crumples, and the book shuts ──
-  const leave = (then: () => void) => {
-    if (busy.current) return;
-    busy.current = true;
-    const g = guide.current!, folds = g.querySelectorAll('.book__fold');
-    gsap.timeline({ onComplete: then })
-      .to(sheet.current, { autoAlpha: 0, duration: 0.3 })
+  /** he folds back up into paper, crumples, and is gone */
+  const foldAway = () => {
+    const g = guide.current;
+    const tl = gsap.timeline();
+    if (!g) return tl;
+    const folds = g.querySelectorAll('.book__fold');
+    return tl
+      .to(g.parentElement!.querySelector('.book__sig'), { autoAlpha: 0, duration: 0.2 })
       .set(folds, { autoAlpha: 1 })
       .set(g.querySelector('.book__whole'), { autoAlpha: 0 })
       .to(g.querySelectorAll('.book__crease'), { autoAlpha: 1, duration: 0.2 })
       .to(folds[2], { rotateX: 178, duration: 0.45, ease: 'power2.in' })
       .to(folds[0], { rotateX: -178, duration: 0.45, ease: 'power2.in' }, '-=0.2')
       .set(folds, { autoAlpha: 0 })
-      .fromTo(g.querySelector('.book__ball'), { autoAlpha: 1, scale: 0.9, y: 0 }, { scale: 0.45, rotate: 25, duration: 0.3, ease: 'power2.in' })
-      .to(g.querySelector('.book__ball'), { autoAlpha: 0, y: -80, scale: 0.25, duration: 0.3 })
-      .to(root.current!.querySelector('.book'), { rotateY: -75, scale: 0.85, autoAlpha: 0, duration: 0.6, ease: 'power2.in' })
+      .fromTo(g.querySelector('.book__ball'), { autoAlpha: 1, scale: 0.9, y: 0, rotate: 0 }, { scale: 0.45, rotate: 25, duration: 0.3, ease: 'power2.in' })
+      .to(g.querySelector('.book__ball'), { autoAlpha: 0, y: -80, scale: 0.25, duration: 0.3 });
+  };
+
+  // ── turning a page: it swings away from its spine, and the next swings in ──
+  const turn = (to: number) => {
+    if (busy.current || to < 0 || to > last || to === page) return;
+    busy.current = true;
+    const fwd = to > page, him = to >= himFrom;
+    const tl = gsap.timeline({ onComplete: () => { busy.current = false; } });
+    if (shown && !him) tl.add(foldAway());   // (going back before his pages: he folds away first)
+    tl.to(sheet.current, { rotateY: fwd ? -88 : 88, autoAlpha: 0.2, duration: 0.38, ease: 'power2.in', transformOrigin: fwd ? '0% 50%' : '100% 50%' })
+      .add(() => { setPage(to); setOpen(null); if (him !== shown) setShown(him); })
+      .fromTo(sheet.current, { rotateY: fwd ? 88 : -88, transformOrigin: fwd ? '100% 50%' : '0% 50%' }, { rotateY: 0, autoAlpha: 1, duration: 0.45, ease: 'power2.out' });
+  };
+
+  // ── it closes: (if he's there) he folds back up, and the book shuts ──
+  const leave = (then: () => void) => {
+    if (busy.current) return;
+    busy.current = true;
+    const tl = gsap.timeline({ onComplete: then }).to(sheet.current, { autoAlpha: 0, duration: 0.3 });
+    if (shown) tl.add(foldAway());
+    tl.to(root.current!.querySelector('.book'), { rotateY: -75, scale: 0.85, autoAlpha: 0, duration: 0.6, ease: 'power2.in' })
       .to(root.current, { autoAlpha: 0, duration: 0.3 }, '-=0.2');
   };
 
@@ -170,22 +189,24 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
         <button type="button" className="book__x" aria-label={M.close} onClick={() => leave(onClose)}>×</button>
         <p className="book__cover">{M.cover}</p>
 
-        <div className="book__spread">
-          {/* him: a crumpled paper that unfolds into his portrait, and his name */}
-          <div className="book__narrator">
-            <div ref={guide} className="book__guide" aria-hidden="true">
-              <img className="book__ball" src={paperUrl} alt="" draggable={false} />
-              <img className="book__whole" src={guideUrl} alt="" draggable={false} />
-              {[0, 1, 2].map((i) => (
-                <div key={i} className={`book__fold book__fold--${i}`}>
-                  <div className="book__face" style={{ backgroundImage: `url(${guideUrl})` }} />
-                  <div className="book__back" style={{ WebkitMaskImage: `url(${guideUrl})`, maskImage: `url(${guideUrl})` }} />
-                  {i !== 1 && <div className="book__crease" />}
-                </div>
-              ))}
+        <div className={`book__spread${shown ? ' book__spread--him' : ''}`}>
+          {/* him (only on the last pages): a crumpled paper that unfolds into his portrait, and his name */}
+          {shown && (
+            <div className="book__narrator">
+              <div ref={guide} className="book__guide" aria-hidden="true">
+                <img className="book__ball" src={paperUrl} alt="" draggable={false} />
+                <img className="book__whole" src={guideUrl} alt="" draggable={false} />
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className={`book__fold book__fold--${i}`}>
+                    <div className="book__face" style={{ backgroundImage: `url(${guideUrl})` }} />
+                    <div className="book__back" style={{ WebkitMaskImage: `url(${guideUrl})`, maskImage: `url(${guideUrl})` }} />
+                    {i !== 1 && <div className="book__crease" />}
+                  </div>
+                ))}
+              </div>
+              <p className="book__sig">{M.signature}</p>
             </div>
-            <p className="book__sig">{M.signature}</p>
-          </div>
+          )}
 
           {/* the page */}
           <div ref={sheet} className="book__sheet" aria-live="polite">

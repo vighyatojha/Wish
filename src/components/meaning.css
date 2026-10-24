@@ -53,11 +53,16 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr minmax(150px, 27%);
+  grid-template-columns: 1fr;
   grid-template-rows: minmax(0, 1fr);
   gap: 0.6rem 1rem;
   align-items: end;
 }
+/* on his pages, he stands on the right */
+.book__spread--him { grid-template-columns: 1fr minmax(150px, 27%); }
+/* (without him, the balloon has no tail: it's the storyteller's box) */
+.book__spread:not(.book__spread--him) .book__balloon::before,
+.book__spread:not(.book__spread--him) .book__balloon::after { display: none; }
 
 /* ── him, telling the story: a ball of paper that unfolds into his portrait ── */
 .book__narrator { grid-column: 2; grid-row: 1; display: grid; justify-items: center; align-self: end; }
@@ -198,7 +203,8 @@
 @media (max-aspect-ratio: 1/1) {
   .book { padding: 0.7rem 0.75rem 0.6rem; }
   .book { height: 94svh; }
-  .book__spread { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+  .book__spread, .book__spread--him { grid-template-columns: 1fr; }
+  .book__spread--him { grid-template-rows: minmax(0, 1fr) auto; }
   .book__thumb .book__panel { --ph: 10svh; }
   .book__grid { gap: 0.55rem 0.7rem; }
   .book__sheet { grid-row: 1; grid-column: 1; }
@@ -216,7 +222,7 @@
 @media (orientation: landscape) and (max-height: 520px) {
   .book { padding: 0.45rem 0.8rem 0.45rem; }
   .book__cover { margin-bottom: 0.25rem; font-size: 1rem; }
-  .book__spread { grid-template-columns: 1fr minmax(110px, 22%); }
+  .book__spread--him { grid-template-columns: 1fr minmax(110px, 22%); }
   .book__guide { max-height: 58svh; }
   .book__panel { --ph: 40svh; }
   .book__sheet { gap: 0.45rem; }
