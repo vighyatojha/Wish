@@ -33,7 +33,7 @@
   all: unset;
   position: absolute;
   top: -14px;
-  right: -12px;
+  left: -12px;
   width: 36px;
   height: 36px;
   display: grid;
@@ -53,14 +53,14 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(150px, 27%) 1fr;
+  grid-template-columns: 1fr minmax(150px, 27%);
   grid-template-rows: minmax(0, 1fr);
   gap: 0.6rem 1rem;
   align-items: end;
 }
 
 /* ── him, telling the story: a ball of paper that unfolds into his portrait ── */
-.book__narrator { display: grid; justify-items: center; align-self: end; }
+.book__narrator { grid-column: 2; grid-row: 1; display: grid; justify-items: center; align-self: end; }
 .book__guide {
   position: relative;
   width: 100%;
@@ -70,7 +70,7 @@
   filter: drop-shadow(0 6px 10px rgba(40, 20, 0, 0.35));
 }
 .book__ball { position: absolute; inset: 6% 8%; width: 84%; height: 88%; object-fit: contain; }
-.book__whole { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+.book__whole { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; transform-origin: 50% 60%; }
 .book__fold { position: absolute; left: 0; width: 100%; height: 33.34%; transform-style: preserve-3d; }
 .book__fold--0 { top: 0; transform-origin: 50% 100%; }
 .book__fold--1 { top: 33.33%; }
@@ -101,6 +101,8 @@
 
 /* ── the page: framed pictures, a caption, his speech balloon ── */
 .book__sheet {
+  grid-column: 1;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -149,13 +151,13 @@
 .book__balloon::before, .book__balloon::after { /* its tail, towards him */
   content: '';
   position: absolute;
-  left: -15px;
+  right: -15px;
   bottom: 18px;
   border: 9px solid transparent;
-  border-right: 15px solid #1d1a17;
-  border-left: 0;
+  border-left: 15px solid #1d1a17;
+  border-right: 0;
 }
-.book__balloon::after { left: -10px; border-right-color: #fff; bottom: 19px; border-width: 8px 13px 8px 0; }
+.book__balloon::after { right: -10px; border-left-color: #fff; bottom: 19px; border-width: 8px 0 8px 13px; }
 @keyframes book-pop { from { opacity: 0; transform: scale(0.94); } }
 .book__balloon strong { display: block; font-weight: 400; color: #2a3158; }
 
@@ -199,20 +201,22 @@
   .book__spread { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
   .book__thumb .book__panel { --ph: 10svh; }
   .book__grid { gap: 0.55rem 0.7rem; }
-  .book__sheet { grid-row: 1; }
-  .book__narrator { grid-row: 2; grid-template-columns: auto 1fr; justify-items: start; align-items: end; gap: 0.5rem; }
+  .book__sheet { grid-row: 1; grid-column: 1; }
+  .book__narrator { grid-row: 2; grid-column: 1; grid-template-columns: 1fr auto; justify-items: end; align-items: end; gap: 0.5rem; }
+  .book__narrator .book__guide { grid-column: 2; grid-row: 1; }
+  .book__narrator .book__sig { grid-column: 1; grid-row: 1; }
   .book__guide { width: auto; height: min(17svh, 150px); max-height: none; }
-  .book__sig { text-align: left; margin-bottom: 0.6rem; }
+  .book__sig { text-align: right; margin-bottom: 0.6rem; }
   .book__panel { --ph: 32svh; }
-  .book__balloon::before { left: 26px; bottom: -15px; border: 9px solid transparent; border-top: 15px solid #1d1a17; border-bottom: 0; }
-  .book__balloon::after { left: 27px; bottom: -10px; border: 8px solid transparent; border-top: 13px solid #fff; border-bottom: 0; }
+  .book__balloon::before { right: 30px; bottom: -15px; border: 9px solid transparent; border-top: 15px solid #1d1a17; border-bottom: 0; }
+  .book__balloon::after { right: 31px; bottom: -10px; border: 8px solid transparent; border-top: 13px solid #fff; border-bottom: 0; }
   .book__colours { grid-template-columns: 1fr; }
 }
 /* a phone held sideways: less height, so smaller pictures */
 @media (orientation: landscape) and (max-height: 520px) {
   .book { padding: 0.45rem 0.8rem 0.45rem; }
   .book__cover { margin-bottom: 0.25rem; font-size: 1rem; }
-  .book__spread { grid-template-columns: minmax(110px, 22%) 1fr; }
+  .book__spread { grid-template-columns: 1fr minmax(110px, 22%); }
   .book__guide { max-height: 58svh; }
   .book__panel { --ph: 40svh; }
   .book__sheet { gap: 0.45rem; }
