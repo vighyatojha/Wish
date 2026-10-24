@@ -436,43 +436,24 @@
   .stop__garden { height: 24svh; }
 }
 
-/* ── at the very end: he offers to tell her the story behind it all ── */
-.stop__invite {
+/* ── after his storybook closes: a little button to open it again ── */
+.stop__reopen {
   position: absolute;
   z-index: 25;
-  left: calc(14px + env(safe-area-inset-left));
-  bottom: calc(14px + env(safe-area-inset-bottom));
-  display: flex;
-  align-items: flex-end;
+  left: calc(16px + env(safe-area-inset-left));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  display: inline-flex;
+  align-items: center;
   gap: 0.4rem;
-  max-width: min(78vw, 24rem);
-  animation: stop-invite 0.9s cubic-bezier(0.3, 1.4, 0.5, 1) both;
-}
-.stop__invite img { width: 64px; height: 76px; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5)); }
-.stop__invite p {
-  margin: 0 0 6px;
-  padding: 0.6rem 0.85rem 0.65rem;
-  display: grid;
-  gap: 0.45rem;
-  font: italic 400 1.02rem / 1.35 'EB Garamond', Georgia, serif;
-  color: #2b2a33;
-  background: rgba(252, 250, 244, 0.96);
-  border-radius: 14px 14px 14px 4px;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
-}
-.stop__invite button {
-  justify-self: start;
-  padding: 0.35rem 0.9rem 0.4rem;
-  font: 400 1.05rem / 1 'Patrick Hand', cursive;
-  color: #fff7e6;
-  background: #2a3158;
-  border: 0;
+  padding: 0.2rem 1rem 0.2rem 0.3rem;
+  font: 400 1.1rem / 1 'Patrick Hand', cursive;
+  color: #fff3d6;
+  background: rgba(16, 20, 40, 0.4);
+  border: 1px solid rgba(255, 226, 160, 0.45);
   border-radius: 999px;
   cursor: pointer;
+  animation: stop-msg-in 1.2s ease both;
 }
-.stop__invite button:focus-visible { outline: 2px solid #ffd98a; outline-offset: 2px; }
-@keyframes stop-invite { from { opacity: 0; transform: translateY(18px) scale(0.92); } }
-/* (an upright phone: the invitation sits above the "watch it again" button, not beside it) */
-@media (max-aspect-ratio: 1/1) {
-  .stop__invite { bottom: calc(72px + env(safe-area-inset-bottom)); max-width: calc(100vw - 28px); }
-}
+.stop__reopen img { width: 34px; height: 40px; object-fit: contain; }
+.stop__reopen:focus-visible { outline: 2px solid #ffd98a; outline-offset: 3px; }
+@media (max-aspect-ratio: 1/1) { .stop__reopen { bottom: calc(70px + env(safe-area-inset-bottom)); } }

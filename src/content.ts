@@ -141,10 +141,12 @@ export const content = {
   // The last screen: he appears as a guide (a crumpled paper that unfolds into him) and tells her
   // what she missed, and what everything in the scene meant.
   meaning: {
-    invite: 'Psst… there’s a little story hidden in all of this. Want to see it?',
-    inviteButton: 'Show me',
+    // (the button to open it again, after she has closed it)
+    reopen: 'Read the story again',
+    // the storybook's cover
+    cover: 'The story behind your surprise',
     signature: '~ the bus that came to wish you',
-    next: 'Next',
+    next: 'Turn the page',
     back: 'Back',
     close: 'Close',
     // part 1: the hidden messages she didn't find

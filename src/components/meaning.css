@@ -1,110 +1,81 @@
-/* ── the last screen: the story behind the surprise ── */
-@property --sx { syntax: '<length>'; inherits: false; initial-value: 50vw; }
-@property --sy { syntax: '<length>'; inherits: false; initial-value: 50vh; }
-@property --sr { syntax: '<length>'; inherits: false; initial-value: 150vmax; }
-
-.meaning {
+/* ── the very end: his storybook, over her flowers (which stay there, dimmed, behind it) ── */
+.bookveil {
   position: fixed;
   inset: 0;
   z-index: 60;
-  overflow: hidden;
-  background: #04060f;
-  color: #2b2a33;
-  animation: meaning-in 1s ease both;
-}
-@keyframes meaning-in { from { opacity: 0; } }
-
-.meaning__bg, .meaning__bg img, .meaning__spot { position: absolute; left: 0; top: 0; }
-.meaning__bg { inset: 0; }
-.meaning__bg img {
-  width: 1600px;
-  height: 900px;
-  max-width: none;
-  transform-origin: 0 0;
-  transition: transform 1.7s cubic-bezier(0.45, 0.05, 0.25, 1), opacity 1.3s ease;
-  user-select: none;
-}
-/* a soft pool of light on what he's talking about; the rest dims */
-.meaning__spot {
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(circle at var(--sx) var(--sy), rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) var(--sr), rgba(4, 6, 18, 0.6) calc(var(--sr) * 1.9));
-  transition: --sx 1.7s cubic-bezier(0.45, 0.05, 0.25, 1), --sy 1.7s cubic-bezier(0.45, 0.05, 0.25, 1), --sr 1.7s ease;
-}
-
-/* the sky's thoughts: white birds and black birds */
-.meaning__birds { position: absolute; inset: 0 0 50% 0; pointer-events: none; }
-.meaning__bird {
-  position: absolute;
-  left: -8vw;
-  width: clamp(26px, 3.4vw, 46px);
-  fill: #fbfbff;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
-  animation: meaning-fly 10s linear infinite, meaning-flap 0.5s ease-in-out infinite alternate;
-}
-.meaning__bird.is-dark { fill: #20222c; filter: none; }
-@keyframes meaning-fly { to { transform: translate(118vw, -4vh); } }
-@keyframes meaning-flap { to { scale: 1 0.45; } }
-
-/* a bunny by the bus door, with its scroll */
-.meaning__bunny { position: absolute; translate: -50% -96%; overflow: visible; animation: meaning-hop 0.8s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
-@keyframes meaning-hop { from { opacity: 0; translate: -50% -70%; } }
-
-.meaning__x {
-  all: unset;
-  position: absolute;
-  z-index: 3;
-  top: calc(12px + env(safe-area-inset-top));
-  right: calc(14px + env(safe-area-inset-right));
-  width: 40px;
-  height: 40px;
   display: grid;
   place-items: center;
-  font: 400 1.7rem / 1 'Patrick Hand', cursive;
-  color: #fff;
-  background: rgba(10, 14, 30, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 50%;
-  cursor: pointer;
+  padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  background: radial-gradient(ellipse at 50% 55%, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.7));
+  perspective: 1600px;
+  animation: book-veil 1s ease both;
 }
-.meaning__x:focus-visible { outline: 2px solid #ffd98a; outline-offset: 2px; }
+@keyframes book-veil { from { background-color: transparent; opacity: 0; } }
 
-/* him and his words, at the bottom */
-.meaning__dock {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-end;
-  gap: 0.4rem;
-  padding: 0 max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
-  pointer-events: none;
-}
-.meaning__dock > * { pointer-events: auto; }
-
-/* ── the guide: a ball of paper that unfolds into him (three panels, like a folded letter) ── */
-.meaning__guide {
+/* the book: a page of thick paper, like a comic */
+.book {
   position: relative;
-  flex: none;
-  height: min(52svh, 440px);
-  aspect-ratio: 620 / 735;
-  perspective: 1100px;
-  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
-  margin-bottom: -2px;
-}
-.meaning__ball { position: absolute; inset: 6% 8%; width: 84%; height: 88%; object-fit: contain; }
-.meaning__fold {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  height: 33.34%;
+  width: min(96vw, 1000px);
+  max-height: 94svh;
+  display: flex;
+  flex-direction: column;
+  padding: 0.8rem 1.1rem 0.75rem;
+  color: #231f1c;
+  background:
+    radial-gradient(rgba(120, 90, 50, 0.07) 1px, transparent 1.4px) 0 0 / 7px 7px,   /* a faint printed grain */
+    linear-gradient(160deg, #fffaf0, #f3ead7);
+  border-radius: 6px 14px 14px 6px;
+  box-shadow: inset 10px 0 18px -10px rgba(90, 60, 30, 0.35), 0 0 0 2px #2a2420, 10px 12px 0 rgba(0, 0, 0, 0.35), 0 24px 60px rgba(0, 0, 0, 0.55);
   transform-style: preserve-3d;
+  transform-origin: 0% 50%;
 }
-.meaning__fold--0 { top: 0; transform-origin: 50% 100%; }
-.meaning__fold--1 { top: 33.33%; }
-.meaning__fold--2 { top: 66.66%; transform-origin: 50% 0; }
-.meaning__face, .meaning__back {
+.book__x {
+  all: unset;
+  position: absolute;
+  top: -14px;
+  right: -12px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  font: 400 1.6rem / 1 'Patrick Hand', cursive;
+  color: #fff;
+  background: #2a2420;
+  border-radius: 50%;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  z-index: 3;
+}
+.book__x:focus-visible { outline: 2px solid #ffd98a; outline-offset: 2px; }
+.book__cover { margin: 0 0 0.45rem; text-align: center; font: 700 clamp(1.05rem, 2.6vw, 1.5rem) / 1.1 'Playfair Display', Georgia, serif; letter-spacing: 0.01em; }
+
+.book__spread {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(150px, 27%) 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0.6rem 1rem;
+  align-items: end;
+}
+
+/* ── him, telling the story: a ball of paper that unfolds into his portrait ── */
+.book__narrator { display: grid; justify-items: center; align-self: end; }
+.book__guide {
+  position: relative;
+  width: 100%;
+  max-height: 52svh;
+  aspect-ratio: 620 / 735;
+  perspective: 900px;
+  filter: drop-shadow(0 6px 10px rgba(40, 20, 0, 0.35));
+}
+.book__ball { position: absolute; inset: 6% 8%; width: 84%; height: 88%; object-fit: contain; }
+.book__whole { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+.book__fold { position: absolute; left: 0; width: 100%; height: 33.34%; transform-style: preserve-3d; }
+.book__fold--0 { top: 0; transform-origin: 50% 100%; }
+.book__fold--1 { top: 33.33%; }
+.book__fold--2 { top: 66.66%; transform-origin: 50% 0; }
+.book__face, .book__back {
   position: absolute;
   inset: 0;
   backface-visibility: hidden;
@@ -112,112 +83,145 @@
   background-size: 100% 300%;
   background-repeat: no-repeat;
 }
-.meaning__fold--0 .meaning__face { background-position: 0 0; }
-.meaning__fold--1 .meaning__face { background-position: 0 50%; }
-.meaning__fold--2 .meaning__face { background-position: 0 100%; }
-/* the back of each panel: plain paper, the shape of the picture */
-.meaning__back {
+.book__fold--0 .book__face { background-position: 0 0; }
+.book__fold--1 .book__face { background-position: 0 50%; }
+.book__fold--2 .book__face { background-position: 0 100%; }
+.book__back {
   transform: rotateX(180deg);
-  background: linear-gradient(170deg, #fbf8f1, #e9e4d8);
-  -webkit-mask-size: 100% 300%;
-  mask-size: 100% 300%;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
+  background: linear-gradient(170deg, #fbf8f1, #e6dfd0);
+  -webkit-mask-size: 100% 300%; mask-size: 100% 300%;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
 }
-.meaning__fold--0 .meaning__back { -webkit-mask-position: 0 0; mask-position: 0 0; }
-.meaning__fold--2 .meaning__back { -webkit-mask-position: 0 100%; mask-position: 0 100%; }
-/* the creases fade once he's unfolded */
-.meaning__crease { position: absolute; left: 6%; right: 6%; height: 10px; pointer-events: none; }
-.meaning__fold--0 .meaning__crease { bottom: 0; background: linear-gradient(to top, rgba(60, 40, 20, 0.22), transparent); }
-.meaning__fold--2 .meaning__crease { top: 0; background: linear-gradient(to bottom, rgba(60, 40, 20, 0.22), transparent); }
+.book__fold--0 .book__back { -webkit-mask-position: 0 0; mask-position: 0 0; }
+.book__fold--2 .book__back { -webkit-mask-position: 0 100%; mask-position: 0 100%; }
+.book__crease { position: absolute; left: 6%; right: 6%; height: 10px; pointer-events: none; }
+.book__fold--0 .book__crease { bottom: 0; background: linear-gradient(to top, rgba(60, 40, 20, 0.22), transparent); }
+.book__fold--2 .book__crease { top: 0; background: linear-gradient(to bottom, rgba(60, 40, 20, 0.22), transparent); }
+.book__sig { margin: 0.2rem 0 0; font: 600 clamp(0.95rem, 1.8vw, 1.15rem) / 1.2 'Dancing Script', cursive; color: #9a5f1f; text-align: center; }
 
-/* ── his words ── */
-.meaning__bubble {
-  position: relative;
-  flex: 0 1 34rem;
-  margin-bottom: 3svh;
-  padding: 0.9rem 1.2rem 0.8rem;
-  background: rgba(252, 250, 244, 0.97);
-  border-radius: 18px;
-  box-shadow: 0 0 0 1.5px rgba(60, 50, 40, 0.25), 0 16px 36px rgba(0, 0, 0, 0.4);
+/* ── the page: framed pictures, a caption, his speech balloon ── */
+.book__sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.3rem 0.5rem 0.4rem 0.2rem;
+  backface-visibility: hidden;
 }
-.meaning__bubble::before { /* its tail, towards him */
+.book__panel {
+  --ph: 44svh;
+  position: relative;
+  width: min(100%, calc(var(--ph) * var(--ar)));
+  aspect-ratio: var(--ar);
+  background-repeat: no-repeat;
+  border: 3px solid #1d1a17;
+  border-radius: 3px;
+  box-shadow: 5px 6px 0 rgba(29, 26, 23, 0.28);
+  overflow: hidden;
+}
+.book__caption {
+  margin: 0;
+  padding: 0.3rem 0.75rem 0.35rem;
+  font: 400 clamp(1.05rem, 2.2vw, 1.35rem) / 1.2 'Patrick Hand', cursive;
+  background: #ffe27a;
+  border: 2.5px solid #1d1a17;
+  box-shadow: 3px 3px 0 rgba(29, 26, 23, 0.3);
+  rotate: -1deg;
+  text-align: center;
+}
+.book__caption--on { position: absolute; left: 10px; top: 10px; max-width: calc(100% - 20px); text-align: left; }
+.book__balloon {
+  position: relative;
+  align-self: stretch;
+  margin: 0;
+  padding: 0.6rem 0.95rem 0.65rem;
+  font: 400 clamp(1.02rem, 1.9vw, 1.2rem) / 1.38 'Patrick Hand', cursive;
+  background: #fff;
+  border: 2.5px solid #1d1a17;
+  border-radius: 18px;
+  animation: book-pop 0.4s cubic-bezier(0.3, 1.5, 0.5, 1) 0.15s both;
+}
+.book__balloon p { margin: 0; }
+.book__balloon::before, .book__balloon::after { /* its tail, towards him */
   content: '';
   position: absolute;
-  left: -9px;
-  bottom: 28px;
-  width: 18px;
-  height: 18px;
-  background: inherit;
-  transform: rotate(45deg);
-  box-shadow: -1.5px 1.5px 0 rgba(60, 50, 40, 0.18);
+  left: -15px;
+  bottom: 18px;
+  border: 9px solid transparent;
+  border-right: 15px solid #1d1a17;
+  border-left: 0;
 }
-.meaning__sig { margin: 0 0 0.3rem; font: 600 1.05rem / 1.2 'Dancing Script', cursive; color: #a06a2a; }
-.meaning__words { animation: meaning-words 0.45s ease both; }
-@keyframes meaning-words { from { opacity: 0; transform: translateY(6px); } }
-.meaning__words h2 { margin: 0 0 0.35rem; font: 400 1.4rem / 1.2 'Patrick Hand', cursive; color: #2b2a33; }
-.meaning__words p { margin: 0 0 0.5rem; font: 400 1.15rem / 1.42 'EB Garamond', Georgia, serif; }
-.meaning__typing { display: flex; gap: 6px; height: 1.6rem; align-items: center; margin: 0.3rem 0 0.6rem; }
-.meaning__typing i { width: 8px; height: 8px; border-radius: 50%; background: #b8ab98; animation: meaning-dot 0.9s ease-in-out infinite; }
-.meaning__typing i:nth-child(2) { animation-delay: 0.15s; }
-.meaning__typing i:nth-child(3) { animation-delay: 0.3s; }
-@keyframes meaning-dot { 50% { transform: translateY(-5px); opacity: 0.5; } }
+.book__balloon::after { left: -10px; border-right-color: #fff; bottom: 19px; border-width: 8px 13px 8px 0; }
+@keyframes book-pop { from { opacity: 0; transform: scale(0.94); } }
+.book__balloon strong { display: block; font-weight: 400; color: #2a3158; }
 
-.meaning__chips { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.2rem 0 0.5rem; }
-.meaning__chip {
-  all: unset;
-  padding: 0.3rem 0.8rem 0.35rem;
-  font: 400 1.05rem / 1.2 'Patrick Hand', cursive;
-  background: #f1ebde;
-  border: 1px solid rgba(120, 95, 60, 0.35);
-  border-radius: 999px;
-  cursor: pointer;
-}
-.meaning__chip.is-on { background: #2a3158; color: #f4f1ff; border-color: transparent; }
-.meaning__chip:focus-visible { outline: 2px solid #c58a2e; outline-offset: 2px; }
-.meaning__secret { padding: 0.55rem 0.75rem; background: #f5f0e5; border-radius: 10px; animation: meaning-words 0.35s ease both; }
-.meaning__secret strong { font: 400 1.1rem / 1.2 'Patrick Hand', cursive; display: block; }
+/* page 1: the hidden ones she missed */
+.book__grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.8rem 0.9rem; }
+.book__thumb { all: unset; display: grid; justify-items: center; gap: 0.3rem; cursor: pointer; font: 400 1.02rem / 1 'Patrick Hand', cursive; }
+.book__thumb .book__panel { --ph: clamp(56px, 12svh, 116px); width: calc(var(--ph) * var(--ar)); transition: transform 0.2s; }
+.book__thumb:hover .book__panel, .book__thumb.is-on .book__panel { transform: translateY(-3px) rotate(0deg); box-shadow: 5px 8px 0 rgba(29, 26, 23, 0.3); }
+.book__thumb.is-on span { background: #2a3158; color: #fff7e6; }
+.book__thumb span { padding: 0.15rem 0.5rem 0.2rem; border-radius: 999px; }
+.book__thumb:focus-visible .book__panel { outline: 3px solid #c58a2e; outline-offset: 2px; }
 
-.meaning__colours { list-style: none; margin: 0 0 0.5rem; padding: 0; display: grid; gap: 0.25rem; font: 400 1.1rem / 1.35 'EB Garamond', Georgia, serif; }
-.meaning__colours span { display: inline-block; width: 0.9em; height: 0.9em; margin-right: 0.45em; border-radius: 50%; vertical-align: -0.08em; box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.15); }
-.meaning__colours b { font-weight: 500; }
-.meaning__sign { font: 600 1.15rem / 1.3 'Dancing Script', cursive !important; color: #a06a2a; text-align: right; }
-.meaning__ps { font-style: italic; color: #6b6474; }
+/* the sky's birds (white and black thoughts), and the bunny with its scroll */
+.book__birds { position: absolute; inset: 0; pointer-events: none; }
+.book__bird { position: absolute; left: -12%; width: 9%; min-width: 16px; fill: #fbfbff; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3)); animation: book-fly 9s linear infinite, book-flap 0.45s ease-in-out infinite alternate; }
+.book__bird.is-dark { fill: #20222c; filter: none; }
+@keyframes book-fly { to { transform: translate(1300%, -40%); } }
+@keyframes book-flap { to { scale: 1 0.45; } }
+.book__bunny { position: absolute; left: 38%; bottom: 10%; width: 34%; height: auto; overflow: visible; animation: book-hop 0.9s cubic-bezier(0.3, 1.6, 0.5, 1) 0.3s both; }
+@keyframes book-hop { from { opacity: 0; transform: translateY(20%); } }
 
-.meaning__nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem 0.6rem; margin-top: 0.3rem; }
-.meaning__nav button { white-space: nowrap; }
-.meaning__dots { display: flex; gap: 5px; margin-right: auto; }
-.meaning__dots i { width: 6px; height: 6px; border-radius: 50%; background: #d8cfbf; transition: background 0.3s, transform 0.3s; }
-.meaning__dots i.is-on { background: #a06a2a; transform: scale(1.3); }
-.meaning__next, .meaning__back {
-  all: unset;
-  cursor: pointer;
-  font: 400 1.1rem / 1 'Patrick Hand', cursive;
-  padding: 0.45rem 1.05rem 0.5rem;
-  border-radius: 999px;
-}
-.meaning__next { background: #2a3158; color: #fff7e6; }
-.meaning__back { color: #6b6474; }
-.meaning__next:focus-visible, .meaning__back:focus-visible { outline: 2px solid #c58a2e; outline-offset: 2px; }
+.book__colours { list-style: none; margin: 0.35rem 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0.15rem 1rem; }
+.book__colours span { display: inline-block; width: 0.85em; height: 0.85em; margin-right: 0.4em; border-radius: 50%; border: 2px solid #1d1a17; vertical-align: -0.05em; }
+.book__colours b { font-weight: 400; color: #2a3158; }
+.book__sign { font: 600 1.25rem / 1.3 'Dancing Script', cursive !important; color: #9a5f1f; text-align: right; }
+.book__ps { color: #5b5560; margin-top: 0.3rem !important; }
 
-/* an upright phone: he stands on the left, just above his words, which take the width */
+.book__nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.45rem 0.6rem; margin-top: 0.6rem; }
+.book__dots { display: flex; gap: 5px; margin-right: auto; }
+.book__dots i { width: 7px; height: 7px; border-radius: 50%; background: #d6c9b0; transition: background 0.3s, transform 0.3s; }
+.book__dots i.is-on { background: #9a5f1f; transform: scale(1.3); }
+.book__next, .book__back { all: unset; cursor: pointer; white-space: nowrap; font: 400 1.1rem / 1 'Patrick Hand', cursive; padding: 0.45rem 1rem 0.5rem; border-radius: 999px; }
+.book__next { background: #2a3158; color: #fff7e6; border: 2px solid #1d1a17; }
+.book__back { color: #5b5560; }
+.book__next:focus-visible, .book__back:focus-visible { outline: 2px solid #c58a2e; outline-offset: 2px; }
+
+/* an upright phone: the page on top, him small at the bottom with his name */
 @media (max-aspect-ratio: 1/1) {
-  .meaning__dock { flex-direction: column; align-items: stretch; gap: 0; }
-  .meaning__guide { height: min(30svh, 300px); align-self: flex-start; margin: 0 0 -1.2rem 2vw; z-index: 1; }
-  .meaning__bubble { flex: none; margin-bottom: 0; padding-top: 1.1rem; }
-  .meaning__bubble::before { left: 24px; top: -8px; bottom: auto; }
-  .meaning__words p { font-size: 1.08rem; }
+  .book { padding: 0.7rem 0.75rem 0.6rem; }
+  .book { height: 94svh; }
+  .book__spread { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+  .book__thumb .book__panel { --ph: 10svh; }
+  .book__grid { gap: 0.55rem 0.7rem; }
+  .book__sheet { grid-row: 1; }
+  .book__narrator { grid-row: 2; grid-template-columns: auto 1fr; justify-items: start; align-items: end; gap: 0.5rem; }
+  .book__guide { width: auto; height: min(17svh, 150px); max-height: none; }
+  .book__sig { text-align: left; margin-bottom: 0.6rem; }
+  .book__panel { --ph: 32svh; }
+  .book__balloon::before { left: 26px; bottom: -15px; border: 9px solid transparent; border-top: 15px solid #1d1a17; border-bottom: 0; }
+  .book__balloon::after { left: 27px; bottom: -10px; border: 8px solid transparent; border-top: 13px solid #fff; border-bottom: 0; }
+  .book__colours { grid-template-columns: 1fr; }
 }
-/* a phone held sideways: everything a little smaller */
+/* a phone held sideways: less height, so smaller pictures */
 @media (orientation: landscape) and (max-height: 520px) {
-  .meaning__guide { height: 70svh; }
-  .meaning__bubble { margin-bottom: 2svh; padding: 0.6rem 0.9rem 0.6rem; }
-  .meaning__words h2 { font-size: 1.15rem; }
-  .meaning__words p, .meaning__colours { font-size: 0.98rem; line-height: 1.32; }
-  .meaning__sig { font-size: 0.95rem; margin-bottom: 0.15rem; }
-  .meaning__bubble { flex-basis: 42rem; }
+  .book { padding: 0.45rem 0.8rem 0.45rem; }
+  .book__cover { margin-bottom: 0.25rem; font-size: 1rem; }
+  .book__spread { grid-template-columns: minmax(110px, 22%) 1fr; }
+  .book__guide { max-height: 58svh; }
+  .book__panel { --ph: 40svh; }
+  .book__sheet { gap: 0.45rem; }
+  .book__balloon { padding: 0.4rem 0.75rem 0.45rem; font-size: 0.98rem; line-height: 1.28; }
+  .book__caption { font-size: 1rem; }
+  .book__nav { margin-top: 0.35rem; }
+  .book__thumb .book__panel { --ph: 13svh; }
+  .book__grid { gap: 0.4rem 0.6rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .meaning__bg img, .meaning__spot { transition-duration: 0.01s; }
-  .meaning__bird { animation: none; display: none; }
+  .book__bird { animation: none; display: none; }
 }

@@ -137,6 +137,9 @@ export class Bloom {
   private motes: Mote[] = [];
   private glowSprite: HTMLCanvasElement;
   private done?: () => void;
+  /** resolves once everything (the bunch and the whole meadow) has finished opening */
+  private onSettled: () => void = () => {};
+  readonly settled = new Promise<void>((r) => { this.onSettled = r; });
   private cued = new Set<string>();
   /** moments worth a sound: 'land' (the seed) and 'bloom' (each flower opening) */
   onCue: (cue: 'land' | 'bloom' | 'spread') => void = () => {};
@@ -317,6 +320,7 @@ export class Bloom {
       this.scene(t, false);
       this.g = real;
       this.snap = c;
+      this.onSettled();
       this.settledAt = t;
     }
     const g = this.g;

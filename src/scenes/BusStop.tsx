@@ -1251,10 +1251,11 @@ export function BusStop({ flying, entered }: Props) {
     await wait(1.2);
     tg.opts.caret = false;
     await wait(3);
-    setUi((u) => ({ ...u, replay: true }));
-    // a moment later, he offers to tell her the story behind it all
-    await wait(2.5);
-    setUi((u) => ({ ...u, invite: true }));
+    // the very end: once the whole meadow has opened and she's had a moment with it,
+    // his little storybook opens over it, the story behind it all
+    await bq.settled.then(live);
+    await wait(4);
+    setUi((u) => ({ ...u, meaning: true }));
   }
 
   const flowers = useMemo(() => ({
@@ -1426,19 +1427,15 @@ export function BusStop({ flying, entered }: Props) {
       <canvas ref={bouquetCanvas} className="layer stop__bouquet" aria-hidden="true" />
       <canvas ref={gardenCanvas} className="stop__garden" aria-label={content.finale.gardenWords} role="img" />
       {ui.invite && !ui.meaning && (
-        <div className="stop__invite" role="note">
-          <img src={guideUrl} alt="" />
-          <p>
-            <span>{content.meaning.invite}</span>
-            <button type="button" onClick={() => setUi((u) => ({ ...u, meaning: true }))}>{content.meaning.inviteButton} ✨</button>
-          </p>
-        </div>
+        <button type="button" className="stop__reopen" onClick={() => setUi((u) => ({ ...u, meaning: true }))}>
+          <img src={guideUrl} alt="" /> {content.meaning.reopen}
+        </button>
       )}
       {ui.meaning && (
         <Meaning
           found={{ ...secretSeen }}
           read={(k) => secretText(k, 0)}
-          onClose={() => setUi((u) => ({ ...u, meaning: false }))}
+          onClose={() => setUi((u) => ({ ...u, meaning: false, replay: true, invite: true }))}
           onReplay={() => location.assign(location.pathname)}
         />
       )}
