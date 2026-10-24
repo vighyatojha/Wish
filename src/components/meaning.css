@@ -57,6 +57,10 @@
 }
 /* on his pages, he stands on the right */
 .book__spread--him { grid-template-columns: 1fr minmax(150px, 27%); }
+/* the last page: just him (bigger), his thanks, and the note to tap on him next time */
+.book__spread--end.book__spread--him { grid-template-columns: 1fr minmax(200px, 42%); }
+.book__spread--end .book__guide { max-height: 72svh; }
+.book__spread--end .book__sheet { gap: 1.1rem; }
 /* (without him, the balloon has no tail: it's the storyteller's box) */
 .book__spread:not(.book__spread--him) .book__balloon::before,
 .book__spread:not(.book__spread--him) .book__balloon::after { display: none; }
@@ -205,7 +209,8 @@
 @media (max-aspect-ratio: 1/1) {
   .book { padding: 0.7rem 0.75rem 0.6rem; }
   .book { height: 94svh; }
-  .book__spread, .book__spread--him { grid-template-columns: 1fr; }
+  .book__spread, .book__spread--him, .book__spread--end.book__spread--him { grid-template-columns: 1fr; }
+  .book__spread--end .book__guide { height: min(30svh, 260px); }
   .book__spread--him { grid-template-rows: minmax(0, 1fr) auto; }
   .book__thumb .book__panel { --ph: 10svh; }
   .book__grid { gap: 0.55rem 0.7rem; }

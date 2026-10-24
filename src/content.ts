@@ -141,8 +141,14 @@ export const content = {
   // The last screen: he appears as a guide (a crumpled paper that unfolds into him) and tells her
   // what she missed, and what everything in the scene meant.
   meaning: {
-    // (the button to open it again, after she has closed it)
-    reopen: 'Read the story again',
+    // at the very end, about 5 seconds after his song has played through once, his picture pops up and asks…
+    ask: 'Psst… would you like to know the story behind all of this? 💛',
+    askYes: 'Yes, tell me!',
+    askLater: 'Maybe later',
+    // …and afterwards (either way) his picture stays with this note; tapping it opens his storybook
+    endNote: 'Whenever you visit again, just tap on me, and I’ll tell you the story behind it all. 💛',
+    // the note by his picture on the first page, when she comes back to the site another time
+    revisitNote: 'Welcome back! Tap on me for the story behind your surprise. 💛',
     // the storybook's cover
     cover: 'The story behind your surprise',
     signature: '~ the bus that came to wish you',

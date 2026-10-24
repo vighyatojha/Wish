@@ -7,7 +7,7 @@
 //                       runs, and the sheet falls apart to reveal
 //                       the fog scene underneath.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import { content } from '../content';
 import { InkText } from '../components/InkText';
 import { gsap, useGSAP, ease, dur } from '../lib/motion';
@@ -17,7 +17,15 @@ import { Paper } from '../lib/paper';
 import { Rain, WetMap } from '../lib/rain';
 import { paintInk } from '../lib/ink';
 import { saveResponse } from '../lib/firebase';
+import { StoryButton } from '../components/StoryButton';
+import { recallEnd } from '../lib/storyMemory';
 import './intro.css';
+
+// his storybook (only fetched if she asks for it here, on a return visit)
+const Meaning = lazy(() => import('../components/Meaning').then((m) => ({ default: m.Meaning })));
+/** a hidden message's first line, for the storybook's "you missed these" page */
+const readHidden = (k: 'moon' | 'stars' | 'fireflies' | 'lamp' | 'birds') =>
+  k === 'birds' ? { title: content.birds.title, line: content.birds.meaning } : { title: content.secrets[k].title, line: content.secrets[k].lines[0] };
 
 const copy = content.intro;
 
@@ -226,6 +234,10 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
     }
   });
 
+  // she has been here before and reached the end: he waits in the corner, offering her the story
+  const [back] = useState(recallEnd);
+  const [story, setStory] = useState(false);
+
   // if page 1 is removed early, still clean everything up
   useEffect(() => () => stopEffects.current?.(), []);
 
@@ -264,6 +276,15 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
           <InkText className="intro__feedback" role="status" aria-live="polite" text={feedback} />
         </form>
       </div>
+
+      {back && phase === 'tap' && !story && (
+        <StoryButton place="start" note={content.meaning.revisitNote} onOpen={() => setStory(true)} />
+      )}
+      {back && story && (
+        <Suspense fallback={null}>
+          <Meaning found={back} read={readHidden} onClose={() => setStory(false)} onReplay={() => setStory(false)} />
+        </Suspense>
+      )}
 
       <canvas ref={paperCanvas} className="layer intro__paper" aria-hidden="true" />
       <canvas ref={rainCanvas} className="layer intro__rain" aria-hidden="true" />

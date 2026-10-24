@@ -194,7 +194,7 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
         <button type="button" className="book__x" aria-label={M.close} onClick={() => leave(onClose)}>×</button>
         <p className="book__cover">{M.cover}</p>
 
-        <div className={`book__spread${shown ? ' book__spread--him' : ''}`}>
+        <div className={`book__spread${shown ? ' book__spread--him' : ''}${page === last ? ' book__spread--end' : ''}`}>
           {/* him (only on the last pages): a crumpled paper that unfolds into his portrait, and his name */}
           {shown && (
             <div className="book__narrator">
@@ -256,10 +256,9 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
             )}
             {page === last && (
               <>
-                <Panel crop={PANELS.end} tilt={-1}>
-                  <p className="book__caption book__caption--on">{M.thanks}</p>
-                </Panel>
+                <p className="book__caption">{M.thanks}</p>
                 <div className="book__balloon">
+                  <p>{M.endNote}</p>
                   <p className="book__ps">{n ? M.psMissed.replace('{n}', String(n)) : M.psFound}</p>
                 </div>
               </>
