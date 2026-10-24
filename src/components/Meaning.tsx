@@ -9,13 +9,12 @@
 //  Then a page for each thing in the scene and what it meant, his thanks,
 //  and a P.S. When she closes it, he folds back up and the book shuts.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { gsap } from 'gsap';
 import { content } from '../content';
 import { AnimalArt } from './Animals';
 import { GrainPattern } from './CuteBird';
 import guideUrl from '../assets/guide.webp';
-import thumbsUrl from '../assets/guide-thumbs.webp';
 import paperUrl from '../assets/guide-paper.webp';
 import dayUrl from '../assets/meaning-day.webp';
 import nightUrl from '../assets/meaning-night.webp';
@@ -26,7 +25,7 @@ const HIDDEN: HiddenKind[] = ['moon', 'stars', 'fireflies', 'lamp', 'birds'];
 
 /** Start fetching the pictures early (they're small): call once the end is near. */
 export function preloadMeaning(): void {
-  for (const u of [guideUrl, thumbsUrl, paperUrl, dayUrl, nightUrl]) { const i = new Image(); i.decoding = 'async'; i.src = u; }
+  for (const u of [guideUrl, paperUrl, dayUrl, nightUrl]) { const i = new Image(); i.decoding = 'async'; i.src = u; }
 }
 
 // Each panel is a piece of one of the two pictures of the scene (day, night: 1600×900),
@@ -103,21 +102,6 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
   const sheet = useRef<HTMLDivElement>(null);
   const busy = useRef(false);
 
-  // ── his expressions: a thumbs-up when he's teasing her, introducing himself and saying thank you;
-  //    looking up, dreamy, while he tells her what everything meant ──
-  const faceFor = (p: number) => (p === 0 || p === last || M.steps[p - 1]?.at === 'colours' ? thumbsUrl : guideUrl);
-  const [face, setFace] = useState(() => faceFor(0));
-  const whole = useRef<HTMLImageElement>(null);
-  useEffect(() => {
-    const want = faceFor(page);
-    if (want === face || !whole.current) return;
-    // (he flips over like a paper card, and turns back with his new face)
-    gsap.timeline()
-      .to(whole.current, { rotateY: 90, duration: 0.18, ease: 'power2.in' })
-      .add(() => setFace(want))
-      .to(whole.current, { rotateY: 0, duration: 0.45, ease: 'back.out(2.2)' });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
 
   // ── it opens: the book swings open, a ball of paper drops onto it and unfolds into him ──
   useLayoutEffect(() => {
@@ -191,11 +175,11 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
           <div className="book__narrator">
             <div ref={guide} className="book__guide" aria-hidden="true">
               <img className="book__ball" src={paperUrl} alt="" draggable={false} />
-              <img ref={whole} className="book__whole" src={face} alt="" draggable={false} />
+              <img className="book__whole" src={guideUrl} alt="" draggable={false} />
               {[0, 1, 2].map((i) => (
                 <div key={i} className={`book__fold book__fold--${i}`}>
-                  <div className="book__face" style={{ backgroundImage: `url(${face})` }} />
-                  <div className="book__back" style={{ WebkitMaskImage: `url(${face})`, maskImage: `url(${face})` }} />
+                  <div className="book__face" style={{ backgroundImage: `url(${guideUrl})` }} />
+                  <div className="book__back" style={{ WebkitMaskImage: `url(${guideUrl})`, maskImage: `url(${guideUrl})` }} />
                   {i !== 1 && <div className="book__crease" />}
                 </div>
               ))}
