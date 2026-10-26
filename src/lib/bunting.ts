@@ -9,6 +9,8 @@
 //    fairies' hands, and each flag hangs from it, tilting with the
 //    string and swinging on its own as the fairies move.
 //  • The fairies themselves are SVG (Fairy.tsx); this file moves them.
+//  • Her photo hangs on a ribbon from the fairy at the end of a row,
+//    tied with a bow, swinging with the bunting as it flies in and off.
 // ─────────────────────────────────────────────────────────────
 import { blinker } from '../components/CuteBird';
 import { FairyRig, FAIRY_HOLD, FAIRY_TOP } from '../components/Fairy';
@@ -280,6 +282,18 @@ export interface BannerBird {
   rig: FairyRig;
 }
 
+// her photo (a scalloped white frame; its bow's knot is at KNOT, shares of the picture)
+const KNOT = [0.497, 0.062] as const;
+interface Photo {
+  img: HTMLImageElement;
+  sprite: HTMLCanvasElement | null;   // the photo with its soft shadow, at the current size
+  row: number;                        // which row's end fairy holds it
+  w: number; h: number;               // its size (CSS px)
+  drop: number;                       // ribbon length, from her hands to the knot
+  shift: number;                      // (sideways, if it would go off the screen)
+  angle: number; spin: number;
+}
+
 export class Banner {
   private g: CanvasRenderingContext2D;
   private rows: Row[] = [];
@@ -291,6 +305,78 @@ export class Banner {
   private blinks: ((t: number) => number)[];
   private prev: { x: number; y: number; tilt: number }[];
   private spritesFor = '';
+  private photo: Photo | null = null;
+
+  /** Her photo, to hang on a ribbon from the fairy at the end of a row. */
+  setPhoto(url: string) {
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => {
+      this.photo = { img, sprite: null, row: 0, w: 0, h: 0, drop: 0, shift: 0, angle: 0, spin: 0 };
+      if (this.W > 1) this.layoutPhoto();
+    };
+    img.src = url;
+  }
+
+  /** Where her photo hangs: wide screens, from the right end of the first row, into the open sky beside
+   *  the name; tall screens, from the right end of the last row, below the words. */
+  private layoutPhoto() {
+    const ph = this.photo;
+    if (!ph || !this.rows.length) return;
+    const { W, H, fw } = this;
+    const wide = W / H > 1.05;
+    ph.row = wide ? 0 : this.rows.length - 1;
+    const row = this.rows[ph.row];
+    const footX = row.cx + row.anchors[row.anchors.length - 1];
+    const footY = row.y;
+    const flagsBottom = footY + fw * 2.05;             // (below the flags at the end of the row, as they swing)
+    const aspect = ph.img.naturalWidth / ph.img.naturalHeight;
+    let h = wide ? H * 0.36 : Math.min(H * 0.27, W * 0.42 / aspect);
+    let top = flagsBottom + fw * 0.15;
+    if (wide && this.rows[1]) {
+      // keep clear of the next row: if they'd overlap side by side, hang below it instead
+      const r1 = this.rows[1], r1Right = r1.cx + r1.width / 2 + fw * CARRIER * 0.5;
+      if (footX - (h * aspect) / 2 < r1Right) top = Math.max(top, r1.y + fw * 1.9);
+    }
+    h = Math.max(fw * 2.2, Math.min(h, H * 0.86 - top));
+    const w = h * aspect;
+    ph.w = w; ph.h = h;
+    ph.drop = top + h * KNOT[1] - footY;
+    // (stay on the screen: if hanging straight down would cut it off, the ribbon leans in a little)
+    const margin = Math.max(10, W * 0.015);
+    const knotX = footX, left = knotX - w * KNOT[0];
+    ph.shift = Math.min(0, W - margin - (left + w)) + Math.max(0, margin - left);
+    // the photo with its soft shadow, drawn once at this size
+    const pad = Math.ceil(fw * 0.5), dpr = this.dpr;
+    const c = document.createElement('canvas');
+    c.width = Math.ceil((w + pad * 2) * dpr); c.height = Math.ceil((h + pad * 2) * dpr);
+    const g = c.getContext('2d')!;
+    g.scale(dpr, dpr);
+    g.shadowColor = 'rgba(20, 20, 40, 0.35)';
+    g.shadowBlur = fw * 0.35;
+    g.shadowOffsetY = fw * 0.12;
+    g.drawImage(ph.img, pad, pad, w, h);
+    ph.sprite = c;
+  }
+
+  /** the bow at the top of her photo: two soft loops of the same white ribbon */
+  private drawBow(g: CanvasRenderingContext2D, x: number, y: number, s: number) {
+    const loop = (dir: number) => {
+      const p = new Path2D();
+      p.moveTo(x, y);
+      p.bezierCurveTo(x + dir * s * 0.35, y - s * 0.95, x + dir * s * 1.05, y - s * 0.75, x + dir * s * 0.95, y - s * 0.28);
+      p.bezierCurveTo(x + dir * s * 0.88, y - s * 0.02, x + dir * s * 0.45, y + s * 0.02, x, y);
+      return p;
+    };
+    for (const dir of [-1, 1]) {
+      const p = loop(dir);
+      g.strokeStyle = 'rgba(120, 112, 105, 0.55)'; g.lineWidth = s * 0.2; g.stroke(p);
+      g.strokeStyle = '#fbfaf6'; g.lineWidth = s * 0.13; g.stroke(p);
+    }
+    g.fillStyle = '#fbfaf6';
+    g.beginPath(); g.ellipse(x, y, s * 0.13, s * 0.11, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(120, 112, 105, 0.55)'; g.lineWidth = s * 0.04; g.stroke();
+  }
 
   constructor(private canvas: HTMLCanvasElement, private birds: BannerBird[], private words: { wide: string[]; tall: string[] }) {
     this.g = canvas.getContext('2d')!;
@@ -358,6 +444,7 @@ export class Banner {
       for (const row of this.rows) for (const f of row.flags) f.sprite = paintFlag(f.letter, fw, this.dpr, ++seed);
     }
     this.birds.forEach((b, i) => { b.g.style.display = i < this.birdsUsed ? '' : 'none'; });
+    this.layoutPhoto();
   }
 
   /** enter: per row 0 → 1 (flown in). away: 0 → 1 (flown off upwards). */
@@ -456,6 +543,33 @@ export class Banner {
         g.moveTo(fw * 0.36, -fw * 0.01);
         g.lineTo(fw * 0.53, fw * 0.005);
         g.stroke();
+        g.restore();
+      }
+
+      // her photo, on a ribbon from the fairy at the end of the row, swinging like the flags
+      const ph = this.photo;
+      if (ph && ph.sprite && ph.row === r) {
+        const [hx, hy] = feet[feet.length - 1];
+        const wind = Math.sin(time * 0.9 + 1.3) * 0.5 + Math.sin(time * 2.1) * 0.2;
+        // (heavier than a flag: it sways gently, and settles quickly after the fairies stop)
+        ph.spin += (-12 * ph.angle - 4 * ph.spin - ax * 0.00005 + wind * 0.06) * step;
+        ph.angle = Math.max(-0.16, Math.min(0.16, ph.angle + ph.spin * step));
+        const lean = Math.atan2(ph.shift, ph.drop);       // (if it has to lean in to stay on screen)
+        g.save();
+        g.translate(hx, hy);
+        g.rotate(-lean + ph.angle);
+        const L = Math.hypot(ph.drop, ph.shift);
+        // the ribbon
+        g.strokeStyle = 'rgba(120, 112, 105, 0.5)'; g.lineWidth = Math.max(2, fw * 0.085);
+        g.beginPath(); g.moveTo(0, 0); g.lineTo(0, L); g.stroke();
+        g.strokeStyle = '#fbfaf6'; g.lineWidth = Math.max(1.2, fw * 0.055);
+        g.beginPath(); g.moveTo(0, 0); g.lineTo(0, L); g.stroke();
+        // the photo (it hangs straight from the knot, whatever the ribbon's lean)
+        g.translate(0, L);
+        g.rotate(lean);
+        const pad = Math.ceil(fw * 0.5);
+        g.drawImage(ph.sprite, -ph.w * KNOT[0] - pad, -ph.h * KNOT[1] - pad, ph.w + pad * 2, ph.h + pad * 2);
+        this.drawBow(g, 0, 0, ph.w * 0.13);
         g.restore();
       }
     });

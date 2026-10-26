@@ -53,6 +53,7 @@ import { GrainPattern, blinker } from '../components/CuteBird';
 import { ButterflyArt, ButterflyRig, TulipArt, TulipRig, TULIP_TOP, TULIP_HEAD } from '../components/Garden';
 import { AnimalArt, AnimalRig, ANIMAL_FEET } from '../components/Animals';
 import { Meaning, preloadMeaning } from '../components/Meaning';
+import varshaPhotoUrl from '../assets/varsha-photo.webp';
 import { StoryButton, guideReady } from '../components/StoryButton';
 import { Note, type NoteHandle } from '../components/Note';
 import { FairyArt, FairyRig, FAIRIES } from '../components/Fairy';
@@ -285,6 +286,7 @@ export function BusStop({ flying, entered }: Props) {
       if (cancelled) return;
       const carriers: BannerBird[] = fairyG.current.map((g) => ({ g: g!, rig: new FairyRig(g!) }));
       banner = new Banner(buntingCanvas.current!, carriers, BUNTING);
+      banner.setPhoto(varshaPhotoUrl); // (her photo, hung from the bunting)
       banner.resize(W, H, bannerTop);
       bannerRef.current = banner;
     });
