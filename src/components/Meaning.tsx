@@ -118,7 +118,7 @@ export function Meaning({ found, onClose, onReplay }: Props) {
   //    widening to reveal him, until he's standing on the smoothed-out sheet ──
   const unfurl = useRef<Unfurl | null>(null);
   const paperCanvas = useRef<HTMLCanvasElement>(null);
-  const openness = useRef({ t: 0 });
+  const openness = useRef({ t: 0, paper: 1 });
   useLayoutEffect(() => {
     if (!shown || !guide.current || !paperCanvas.current) return;
     const g = guide.current, sig = g.parentElement!.querySelector('.book__sig')!;
@@ -126,10 +126,10 @@ export function Meaning({ found, onClose, onReplay }: Props) {
     img.src = guideUrl;
     const u = (unfurl.current = new Unfurl(paperCanvas.current, img));
     if (location.search.includes('debug')) Object.assign(window, { __unfurl: u }); // (tests can draw any moment of it)
-    const fit = () => { u.resize(); u.draw(openness.current.t); };
+    const fit = () => { u.resize(); u.draw(openness.current.t, openness.current.paper); };
     const ro = new ResizeObserver(fit);
     ro.observe(paperCanvas.current);
-    openness.current.t = 0;
+    openness.current.t = 0; openness.current.paper = 1;
     gsap.set(sig, { autoAlpha: 0 });
     gsap.set(paperCanvas.current, { autoAlpha: 0, y: -50, rotate: -18 });
     let tl: gsap.core.Timeline | null = null;
@@ -139,8 +139,10 @@ export function Meaning({ found, onClose, onReplay }: Props) {
         // the ball drops softly onto the page…
         .to(paperCanvas.current, { autoAlpha: 1, y: 0, rotate: 0, duration: 0.8, ease: 'power2.out' })
         // …and opens out, slowly at first, then all the way
-        .to(openness.current, { t: 1, duration: 2.6, ease: 'none', onUpdate: () => u.draw(openness.current.t) }, '-=0.25')
-        .to(sig, { autoAlpha: 1, duration: 0.7, ease: 'power1.out' }, '-=0.3');
+        .to(openness.current, { t: 1, duration: 2.6, ease: 'none', onUpdate: () => u.draw(openness.current.t, openness.current.paper) }, '-=0.25')
+        .to(sig, { autoAlpha: 1, duration: 0.7, ease: 'power1.out' }, '-=0.3')
+        // …and once he's out, the paper fades away, leaving just him
+        .to(openness.current, { paper: 0, duration: 0.8, ease: 'power1.inOut', onUpdate: () => u.draw(openness.current.t, openness.current.paper) }, '-=0.2');
     };
     if (img.complete) go(); else img.onload = go;
     return () => { tl?.kill(); ro.disconnect(); };
@@ -153,7 +155,8 @@ export function Meaning({ found, onClose, onReplay }: Props) {
     if (!u || !c || !g) return tl;
     return tl
       .to(g.parentElement!.querySelector('.book__sig'), { autoAlpha: 0, duration: 0.3 })
-      .to(openness.current, { t: 0.12, duration: 1.5, ease: 'power1.inOut', onUpdate: () => u.draw(openness.current.t) })
+      .to(openness.current, { paper: 1, duration: 0.4, ease: 'power1.out', onUpdate: () => u.draw(openness.current.t, openness.current.paper) })
+      .to(openness.current, { t: 0.12, duration: 1.5, ease: 'power1.inOut', onUpdate: () => u.draw(openness.current.t, openness.current.paper) })
       .to(c, { autoAlpha: 0, y: -40, rotate: 14, duration: 0.5, ease: 'power1.in' });
   };
 

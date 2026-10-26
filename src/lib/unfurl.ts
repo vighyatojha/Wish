@@ -83,7 +83,8 @@ export class Unfurl {
     this.canvas.height = Math.round(this.H * this.dpr);
   }
 
-  draw(t: number) {
+  /** `paper`: how much of the sheet is still there (it fades away once he's out, leaving just him) */
+  draw(t: number, paper = 1) {
     const { g, W, H, dpr } = this;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
@@ -110,6 +111,7 @@ export class Unfurl {
     });
     sheet.closePath();
     g.save();
+    g.globalAlpha = paper;
     g.shadowColor = 'rgba(30, 20, 10, 0.35)';
     g.shadowBlur = bw * 0.05;
     g.shadowOffsetY = bw * 0.02;
@@ -117,11 +119,11 @@ export class Unfurl {
     g.fill(sheet);
     g.restore();
     g.save();
+    g.globalAlpha = paper;
     g.clip(sheet);
     const tx = cx - R * 1.25, ty = cy - R * 1.35, ts = R * 2.6;
-    g.globalAlpha = 1;
     g.drawImage(this.soft, tx, ty, ts, ts);
-    g.globalAlpha = 1 - flat * 0.85;                         // (the creases soften as it's smoothed out)
+    g.globalAlpha = paper * (1 - flat * 0.85);                         // (the creases soften as it's smoothed out)
     g.drawImage(this.tight, tx, ty, ts, ts);
     g.restore();
 
