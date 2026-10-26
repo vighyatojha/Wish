@@ -53,11 +53,10 @@ import { GrainPattern, blinker } from '../components/CuteBird';
 import { ButterflyArt, ButterflyRig, TulipArt, TulipRig, TULIP_TOP, TULIP_HEAD } from '../components/Garden';
 import { AnimalArt, AnimalRig, ANIMAL_FEET } from '../components/Animals';
 import { Meaning, preloadMeaning } from '../components/Meaning';
-import varshaPhotoUrl from '../assets/varsha-photo.webp';
 import { StoryButton, guideReady } from '../components/StoryButton';
 import { Note, type NoteHandle } from '../components/Note';
 import { FairyArt, FairyRig, FAIRIES } from '../components/Fairy';
-import { loadedPictures, loadedFilm, loadedBirdsong, loadedFlowerSong, onProgress, progress, type Pictures } from '../lib/preload';
+import { loadedPictures, loadedPhoto, loadedFilm, loadedBirdsong, loadedFlowerSong, onProgress, progress, type Pictures } from '../lib/preload';
 import './busstop.css';
 
 const PIC_W = 1611, PIC_H = 906;
@@ -286,7 +285,7 @@ export function BusStop({ flying, entered }: Props) {
       if (cancelled) return;
       const carriers: BannerBird[] = fairyG.current.map((g) => ({ g: g!, rig: new FairyRig(g!) }));
       banner = new Banner(buntingCanvas.current!, carriers, BUNTING);
-      banner.setPhoto(varshaPhotoUrl); // (her photo, hung from the bunting)
+      void loadedPhoto().then((u) => banner?.setPhoto(u)); // (her photo, hung from the bunting: downloaded early)
       banner.resize(W, H, bannerTop);
       bannerRef.current = banner;
     });
@@ -951,7 +950,7 @@ export function BusStop({ flying, entered }: Props) {
     for (let k = 0; k < 40 && !bannerRef.current; k++) await wait(0.1);
     if (!bannerRef.current) return;
     // (her photo comes with the flags: wait for it if it's still on its way, but not for long)
-    await Promise.race([bannerRef.current.photoReady, wait(8)]).then(live);
+    await Promise.race([loadedPhoto().then(() => bannerRef.current!.photoReady), wait(15)]).then(live);
     Object.assign(S, { banner: true, away: 0, row0: 0, row1: 0, row2: 0 });
     gsap.to(S, { row0: 1, duration: 2.6, ease: 'power3.out' });
     gsap.to(S, { row1: 1, duration: 2.6, ease: 'power3.out', delay: 0.55 });

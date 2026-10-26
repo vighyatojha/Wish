@@ -20,6 +20,7 @@ import morningUrl from '../assets/stop-morning.webp';
 import filmUrl from '../assets/bus-arrives.mp4';
 import birdsongUrl from '../assets/birdsong.m4a';
 import flowerSongUrl from '../assets/flower-song.mp3';
+import varshaPhotoUrl from '../assets/varsha-photo.webp';
 
 export const PICTURES = { morning: morningUrl, empty: emptyUrl, bus: busUrl, masks: masksUrl, masks2: masks2Url, lamp: lampUrl, moon: moonUrl };
 export type PictureKey = keyof typeof PICTURES;
@@ -117,7 +118,7 @@ function decoded(src: string): Promise<string> {
   });
 }
 
-let started: { pictures: Promise<Pictures>; film: Promise<string>; birdsong: Promise<string>; flowerSong: Promise<string> } | null = null;
+let started: { pictures: Promise<Pictures>; photo: Promise<string>; film: Promise<string>; birdsong: Promise<string>; flowerSong: Promise<string> } | null = null;
 
 export function preloadStory() {
   if (started) return started;
@@ -125,15 +126,18 @@ export function preloadStory() {
   const pictures = Promise.all(keys.map((k) => download(PICTURES[k]).then(decoded)))
     .then((urls) => Object.fromEntries(keys.map((k, i) => [k, urls[i]])) as Pictures);
   // the film and the birdsong only start once the pictures are in, so they don't slow them down
-  const film = pictures.then(() => download(filmUrl));
+  // her photo next (small, and on the bunting soon after the start), then the bus film
+  const photo = pictures.then(() => download(varshaPhotoUrl));
+  const film = photo.then(() => download(filmUrl));
   const birdsong = film.then(() => download(birdsongUrl));
   // the song for her flowers comes last of all: it's only needed at the very end, minutes later
   const flowerSong = birdsong.then(() => download(flowerSongUrl));
-  started = { pictures, film, birdsong, flowerSong };
+  started = { pictures, photo, film, birdsong, flowerSong };
   return started;
 }
 
 export const loadedPictures = () => preloadStory().pictures;
+export const loadedPhoto = () => preloadStory().photo;
 export const loadedFilm = () => preloadStory().film;
 export const loadedBirdsong = () => preloadStory().birdsong;
 export const loadedFlowerSong = () => preloadStory().flowerSong;
