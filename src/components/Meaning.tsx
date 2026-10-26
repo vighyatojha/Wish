@@ -15,7 +15,7 @@ import { content } from '../content';
 import { AnimalArt } from './Animals';
 import { GrainPattern } from './CuteBird';
 import guideUrl from '../assets/guide.webp';
-import paperUrl from '../assets/guide-paper.webp';
+import { Unfurl } from '../lib/unfurl';
 import dayUrl from '../assets/meaning-day.webp';
 import nightUrl from '../assets/meaning-night.webp';
 import './meaning.css';
@@ -25,7 +25,7 @@ const HIDDEN: HiddenKind[] = ['moon', 'stars', 'fireflies', 'lamp', 'birds'];
 
 /** Start fetching the pictures early (they're small): call once the end is near. */
 export function preloadMeaning(): void {
-  for (const u of [guideUrl, paperUrl, dayUrl, nightUrl]) { const i = new Image(); i.decoding = 'async'; i.src = u; }
+  for (const u of [guideUrl, dayUrl, nightUrl]) { const i = new Image(); i.decoding = 'async'; i.src = u; }
 }
 
 // Each panel is a piece of one of the two pictures of the scene (day, night: 1600×900),
@@ -114,52 +114,47 @@ export function Meaning({ found, onClose, onReplay }: Props) {
     return () => ctx.revert();
   }, []);
 
-  // ── he arrives: a ball of paper settles onto the page, opens out into a folded letter,
-  //    and the letter unfolds into him, all in one smooth movement ──
+  // ── he arrives: a crumpled ball of paper drops onto the page and slowly opens out, its hole
+  //    widening to reveal him, until he's standing on the smoothed-out sheet ──
+  const unfurl = useRef<Unfurl | null>(null);
+  const paperCanvas = useRef<HTMLCanvasElement>(null);
+  const openness = useRef({ t: 0 });
   useLayoutEffect(() => {
-    if (!shown || !guide.current) return;
-    const g = guide.current;
-    const ball = g.querySelector('.book__ball')!, letter = g.querySelector('.book__letter')!;
-    const folds = g.querySelectorAll('.book__fold'), whole = g.querySelector('.book__whole')!;
-    const sig = g.parentElement!.querySelector('.book__sig')!;
-    gsap.set(ball, { autoAlpha: 0, y: -40, scale: 0.5, rotate: -12 });
-    gsap.set([letter, whole, sig], { autoAlpha: 0 });
-    gsap.set(letter, { scale: 0.88 });
-    gsap.set(folds[0], { rotateX: -178 }); gsap.set(folds[2], { rotateX: 178 });
-    const tl = gsap.timeline({ delay: 0.3 })
-      // the paper ball drifts down onto the page…
-      .to(ball, { autoAlpha: 1, y: 0, scale: 0.62, rotate: 0, duration: 0.8, ease: 'power2.out' })
-      // …loosens a little…
-      .to(ball, { scale: 0.7, rotate: 4, duration: 0.5, ease: 'sine.inOut' })
-      // …and opens out into a folded letter (the two cross-fade as one)
-      .to(ball, { scale: 0.98, rotate: 0, autoAlpha: 0, duration: 0.6, ease: 'power1.inOut' })
-      .to(letter, { autoAlpha: 1, scale: 1, duration: 0.6, ease: 'power1.inOut' }, '<')
-      // the letter unfolds: the top third and the bottom third open together, gently
-      .to(folds[0], { rotateX: 0, duration: 1.1, ease: 'power2.inOut' }, '-=0.1')
-      .to(folds[2], { rotateX: 0, duration: 1.1, ease: 'power2.inOut' }, '<0.12')
-      // (then the three panels give way to the one whole picture: it looks the same, but has no seams)
-      .to(whole, { autoAlpha: 1, duration: 0.25 })
-      .set(letter, { autoAlpha: 0 })
-      .to(sig, { autoAlpha: 1, duration: 0.7, ease: 'power1.out' }, '-=0.1');
-    return () => { tl.kill(); };
+    if (!shown || !guide.current || !paperCanvas.current) return;
+    const g = guide.current, sig = g.parentElement!.querySelector('.book__sig')!;
+    const img = new Image();
+    img.src = guideUrl;
+    const u = (unfurl.current = new Unfurl(paperCanvas.current, img));
+    if (location.search.includes('debug')) Object.assign(window, { __unfurl: u }); // (tests can draw any moment of it)
+    const fit = () => { u.resize(); u.draw(openness.current.t); };
+    const ro = new ResizeObserver(fit);
+    ro.observe(paperCanvas.current);
+    openness.current.t = 0;
+    gsap.set(sig, { autoAlpha: 0 });
+    gsap.set(paperCanvas.current, { autoAlpha: 0, y: -50, rotate: -18 });
+    let tl: gsap.core.Timeline | null = null;
+    const go = () => {
+      fit();
+      tl = gsap.timeline({ delay: 0.25 })
+        // the ball drops softly onto the page…
+        .to(paperCanvas.current, { autoAlpha: 1, y: 0, rotate: 0, duration: 0.8, ease: 'power2.out' })
+        // …and opens out, slowly at first, then all the way
+        .to(openness.current, { t: 1, duration: 2.6, ease: 'none', onUpdate: () => u.draw(openness.current.t) }, '-=0.25')
+        .to(sig, { autoAlpha: 1, duration: 0.7, ease: 'power1.out' }, '-=0.3');
+    };
+    if (img.complete) go(); else img.onload = go;
+    return () => { tl?.kill(); ro.disconnect(); };
   }, [shown]);
 
-  /** he folds back up into a letter, closes into a ball of paper, and drifts away */
+  /** he folds back up: the sheet crumples back into a ball around him, and it drifts away */
   const foldAway = () => {
-    const g = guide.current;
     const tl = gsap.timeline();
-    if (!g) return tl;
-    const ball = g.querySelector('.book__ball')!, letter = g.querySelector('.book__letter')!;
-    const folds = g.querySelectorAll('.book__fold'), whole = g.querySelector('.book__whole')!;
+    const u = unfurl.current, c = paperCanvas.current, g = guide.current;
+    if (!u || !c || !g) return tl;
     return tl
       .to(g.parentElement!.querySelector('.book__sig'), { autoAlpha: 0, duration: 0.3 })
-      .set(letter, { autoAlpha: 1, scale: 1 })
-      .set(whole, { autoAlpha: 0 })
-      .to(folds[2], { rotateX: 178, duration: 0.85, ease: 'power2.inOut' })
-      .to(folds[0], { rotateX: -178, duration: 0.85, ease: 'power2.inOut' }, '<0.1')
-      .fromTo(ball, { autoAlpha: 0, scale: 0.98, y: 0, rotate: 0 }, { autoAlpha: 1, scale: 0.68, rotate: 6, duration: 0.5, ease: 'power1.inOut' })
-      .to(letter, { autoAlpha: 0, scale: 0.88, duration: 0.5, ease: 'power1.inOut' }, '<')
-      .to(ball, { autoAlpha: 0, y: -36, scale: 0.5, rotate: 14, duration: 0.6, ease: 'power1.in' });
+      .to(openness.current, { t: 0.12, duration: 1.5, ease: 'power1.inOut', onUpdate: () => u.draw(openness.current.t) })
+      .to(c, { autoAlpha: 0, y: -40, rotate: 14, duration: 0.5, ease: 'power1.in' });
   };
 
   // ── turning a page: the old page slides softly away, the next slides in ──
@@ -198,16 +193,7 @@ export function Meaning({ found, onClose, onReplay }: Props) {
           {shown && (
             <div className="book__narrator">
               <div ref={guide} className="book__guide" aria-hidden="true">
-                <img className="book__ball" src={paperUrl} alt="" draggable={false} />
-                <img className="book__whole" src={guideUrl} alt="" draggable={false} />
-                <div className="book__letter">
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} className={`book__fold book__fold--${i}`}>
-                      <div className="book__face" style={{ backgroundImage: `url(${guideUrl})` }} />
-                      <div className="book__paperback" style={{ WebkitMaskImage: `url(${guideUrl})`, maskImage: `url(${guideUrl})` }} />
-                    </div>
-                  ))}
-                </div>
+                <canvas ref={paperCanvas} className="book__unfurl" />
               </div>
               <p className="book__sig">{M.signature}</p>
             </div>

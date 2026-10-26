@@ -258,3 +258,9 @@
   .book__spread--ps .book__grid { gap: 0.4rem 0.55rem; }
   .book__spread--ps .book__caption { padding: 0.25rem 0.6rem 0.3rem; }
 }
+
+/* his paper: a canvas a little bigger than his picture (so the opened sheet shows around him) */
+.book__unfurl { position: absolute; inset: -12%; width: 124%; height: 124%; pointer-events: none; }
+/* (his column keeps a margin, so the opened sheet stays inside the book) */
+.book__spread--him .book__narrator { padding: 0 6% 0 4%; }
+.book__sig { position: relative; z-index: 2; }   /* (in front of his opened sheet of paper) */
