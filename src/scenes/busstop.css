@@ -436,24 +436,3 @@
   .stop__garden { height: 24svh; }
 }
 
-/* ── after his storybook closes: a little button to open it again ── */
-.stop__reopen {
-  position: absolute;
-  z-index: 25;
-  left: calc(16px + env(safe-area-inset-left));
-  bottom: calc(16px + env(safe-area-inset-bottom));
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.2rem 1rem 0.2rem 0.3rem;
-  font: 400 1.1rem / 1 'Patrick Hand', cursive;
-  color: #fff3d6;
-  background: rgba(16, 20, 40, 0.4);
-  border: 1px solid rgba(255, 226, 160, 0.45);
-  border-radius: 999px;
-  cursor: pointer;
-  animation: stop-msg-in 1.2s ease both;
-}
-.stop__reopen img { width: 34px; height: 40px; object-fit: contain; }
-.stop__reopen:focus-visible { outline: 2px solid #ffd98a; outline-offset: 3px; }
-@media (max-aspect-ratio: 1/1) { .stop__reopen { bottom: calc(70px + env(safe-area-inset-bottom)); } }

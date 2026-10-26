@@ -23,9 +23,7 @@ import './intro.css';
 
 // his storybook (only fetched if she asks for it here, on a return visit)
 const Meaning = lazy(() => import('../components/Meaning').then((m) => ({ default: m.Meaning })));
-/** a hidden message's first line, for the storybook's "you missed these" page */
-const readHidden = (k: 'moon' | 'stars' | 'fireflies' | 'lamp' | 'birds') =>
-  k === 'birds' ? { title: content.birds.title, line: content.birds.meaning } : { title: content.secrets[k].title, line: content.secrets[k].lines[0] };
+
 
 const copy = content.intro;
 
@@ -282,7 +280,7 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
       )}
       {back && story && (
         <Suspense fallback={null}>
-          <Meaning found={back} read={readHidden} onClose={() => setStory(false)} onReplay={() => setStory(false)} />
+          <Meaning found={back} onClose={() => setStory(false)} onReplay={() => setStory(false)} />
         </Suspense>
       )}
 

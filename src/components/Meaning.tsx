@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-//  The very end: his little storybook, "the story behind your surprise".
+//  The very end: his little book, "what everything here means".
 //  It opens over her flowers (they stay there, dimmed, behind it), like a
 //  comic: each page is one framed picture cut from the scene she just
 //  watched, with a caption and a speech balloon from him.
@@ -84,19 +84,18 @@ function Panel({ crop, tilt = 0, className = '', children }: { crop: Crop; tilt?
 interface Props {
   /** how many times she opened each hidden message */
   found: Record<HiddenKind, number>;
-  /** a hidden message's text (its first line) */
-  read: (kind: HiddenKind) => { title: string; line: string };
   onClose: () => void;
   onReplay: () => void;
 }
 
-export function Meaning({ found, read, onClose, onReplay }: Props) {
+export function Meaning({ found, onClose, onReplay }: Props) {
   const M = content.meaning;
   const missed = useMemo(() => HIDDEN.filter((k) => !found[k]), [found]);
   // pages: 0 = what she missed, 1…n = what it meant, n+1 = thank you
-  const last = M.steps.length + 1;
+  // pages: what each thing means (one page each; he arrives on the last of them, the bus's colours),
+  // then his thanks, then a P.S.: the hidden messages she missed
+  const S = M.steps.length, thanksPage = S, last = S + 1;
   const [page, setPage] = useState(0);
-  const [open, setOpen] = useState<HiddenKind | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const guide = useRef<HTMLDivElement>(null);
   const sheet = useRef<HTMLDivElement>(null);
@@ -104,7 +103,7 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
 
 
   // he only appears for the last pages: from "today, I'm the bus that came to wish you" to the end
-  const himFrom = M.steps.findIndex((st) => st.at === 'colours') + 1;
+  const himFrom = M.steps.findIndex((st) => st.at === 'colours');
   const [shown, setShown] = useState(false);
 
   // ── the book opens: it rises softly into view over her flowers ──
@@ -171,7 +170,7 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
     const tl = gsap.timeline({ onComplete: () => { busy.current = false; } });
     if (shown && !him) tl.add(foldAway());   // (going back before his pages: he folds away first)
     tl.to(sheet.current, { autoAlpha: 0, x: -28 * dir, duration: 0.32, ease: 'power1.in' })
-      .add(() => { setPage(to); setOpen(null); if (him !== shown) setShown(him); })
+      .add(() => { setPage(to); if (him !== shown) setShown(him); })
       .fromTo(sheet.current, { autoAlpha: 0, x: 28 * dir }, { autoAlpha: 1, x: 0, duration: 0.5, ease: 'power2.out', delay: 0.04 });
   };
 
@@ -185,7 +184,7 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
       .to(root.current, { autoAlpha: 0, duration: 0.5, ease: 'power1.in' }, '-=0.3');
   };
 
-  const step = page >= 1 && page < last ? M.steps[page - 1] : null;
+  const step = page < S ? M.steps[page] : null;
   const n = missed.length;
 
   return (
@@ -194,7 +193,7 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
         <button type="button" className="book__x" aria-label={M.close} onClick={() => leave(onClose)}>×</button>
         <p className="book__cover">{M.cover}</p>
 
-        <div className={`book__spread${shown ? ' book__spread--him' : ''}${page === last ? ' book__spread--end' : ''}`}>
+        <div className={`book__spread${shown ? ' book__spread--him' : ''}${page === thanksPage ? ' book__spread--end' : ''}${page === last ? ' book__spread--ps' : ''}`}>
           {/* him (only on the last pages): a crumpled paper that unfolds into his portrait, and his name */}
           {shown && (
             <div className="book__narrator">
@@ -216,30 +215,9 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
 
           {/* the page */}
           <div ref={sheet} className="book__sheet" aria-live="polite">
-            {page === 0 && (
-              <>
-                <p className="book__caption">{n ? M.missedTitle : M.foundAll}</p>
-                {n > 0 && (
-                  <>
-                    <div className="book__grid">
-                      {missed.map((k, i) => (
-                        <button key={k} type="button" className={`book__thumb${open === k ? ' is-on' : ''}`} onClick={() => setOpen(open === k ? null : k)}>
-                          <Panel crop={PANELS[`h_${k}`]} tilt={i % 2 ? 1.2 : -1.2} />
-                          <span>{M.hidden[k]}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <p className="book__balloon">
-                      {open ? <><strong>{read(open).title}</strong> {read(open).line}</> : M.missedText}
-                    </p>
-                  </>
-                )}
-                {n === 0 && <Panel crop={PANELS.end} tilt={-1} />}
-              </>
-            )}
             {step && (
               <>
-                <Panel crop={PANELS[step.at]} tilt={page % 2 ? -1.2 : 1.2}>
+                <Panel crop={PANELS[step.at]} tilt={page % 2 ? 1.2 : -1.2}>
                   <p className="book__caption book__caption--on">{step.title}</p>
                 </Panel>
                 <div className="book__balloon">
@@ -254,13 +232,25 @@ export function Meaning({ found, read, onClose, onReplay }: Props) {
                 </div>
               </>
             )}
+            {page === thanksPage && (
+              <p className="book__caption book__caption--big">{M.thanks}</p>
+            )}
             {page === last && (
               <>
-                <p className="book__caption">{M.thanks}</p>
-                <div className="book__balloon">
-                  <p>{M.endNote}</p>
-                  <p className="book__ps">{n ? M.psMissed.replace('{n}', String(n)) : M.psFound}</p>
-                </div>
+                <p className="book__caption">{n ? M.missedTitle : M.foundAll}</p>
+                {n > 0 && (
+                  <>
+                    <div className="book__grid">
+                      {missed.map((k, i) => (
+                        <div key={k} className="book__thumb">
+                          <Panel crop={PANELS[`h_${k}`]} tilt={i % 2 ? 1.2 : -1.2} />
+                          <span>{M.hidden[k]}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="book__balloon">{M.missedText}</p>
+                  </>
+                )}
               </>
             )}
           </div>

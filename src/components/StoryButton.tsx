@@ -1,5 +1,5 @@
 // His picture, popping up at the very end with a little note.
-//  • asking: "would you like to know the story behind all of this?" with two buttons
+//  • asking: "would you like to know what everything here means?" with two buttons
 //  • otherwise: "whenever you visit again, just tap on me…" (tapping him opens his storybook)
 // Also on the first page when she visits again.
 import guideUrl from '../assets/guide.webp';

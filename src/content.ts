@@ -142,23 +142,23 @@ export const content = {
   // what she missed, and what everything in the scene meant.
   meaning: {
     // at the very end, about 5 seconds after his song has played through once, his picture pops up and asks…
-    ask: 'Psst… would you like to know the story behind all of this? 💛',
-    askYes: 'Yes, tell me!',
+    ask: 'Psst… would you like to know what everything here means, and why it’s there? 💛',
+    askYes: 'Yes, show me!',
     askLater: 'Maybe later',
-    // …and afterwards (either way) his picture stays with this note; tapping it opens his storybook
-    endNote: 'Whenever you visit again, just tap on me, and I’ll tell you the story behind it all. 💛',
+    // …if she says "maybe later", his picture stays with this note; tapping it opens his explanation
+    endNote: 'Whenever you’d like to know, just tap on me. 💛',
     // the note by his picture on the first page, when she comes back to the site another time
-    revisitNote: 'Welcome back! Tap on me for the story behind your surprise. 💛',
-    // the storybook's cover
-    cover: 'The story behind your surprise',
+    revisitNote: 'Welcome back! Tap on me to see what everything here means. 💛',
+    // the title of his explanation (what each thing in the scene means, and why it's there)
+    cover: 'What everything here means',
     signature: '~ the bus that came to wish you',
     next: 'Turn the page',
     back: 'Back',
     close: 'Close',
-    // part 1: the hidden messages she didn't find
-    missedTitle: 'First… you missed a few little things 🤭',
-    missedText: 'There were a few hidden messages tucked away in the scene. Tap one to read it here:',
-    foundAll: 'You found every hidden message! Nothing gets past you. 🎉',
+    // the last page, a P.S.: the things she didn't tap on (it doesn't give their messages away)
+    missedTitle: 'P.S. You missed a few little things 🤭',
+    missedText: 'Each of these had a hidden message for you in the scene. Next time, try tapping on them… picture abhi baaki hai! 💫',
+    foundAll: 'P.S. You found every hidden message along the way! Nothing gets past you. 🎉',
     hidden: {
       moon: '🌙 The moon',
       stars: '⭐ The stars',
@@ -166,7 +166,7 @@ export const content = {
       lamp: '🏮 The lamp',
       birds: '🕊️ The birds',
     },
-    // part 2: what it all meant (each one shows its part of the picture)
+    // what each thing means (each page shows its part of the picture)
     steps: [
       { at: 'stop', title: 'This whole place is your life', text: 'And you are the bus stop. Life keeps moving around us, through different times, situations and seasons, and just like this little stop, you stay, take it all in, and keep going. 🚏' },
       { at: 'sky', title: '☁️ The sky is your mind', text: 'It’s endless, with no limit to how far it can go. The birds flying across it are your thoughts: the white ones are the good ones, the black ones are the worries. You don’t have to chase every bird; some are better left to fly away. 🕊️' },
@@ -185,9 +185,6 @@ export const content = {
       ['#7cc26a', 'The leaf', 'a new chapter'],
     ],
     thanks: 'I tried my best to make you feel at least one of these. Thank you for being here, and I hope you have a lovely day! 💛',
-    // the little note at the very end ({n}: how many hidden messages she missed)
-    psMissed: 'P.S. By the way, you missed {n} hidden things along the way 🤭 Picture abhi baaki hai! 💫',
-    psFound: 'P.S. You found every hidden thing along the way. Picture abhi baaki hai! 💫',
   },
 
   // The small round button in the corner

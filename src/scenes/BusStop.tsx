@@ -725,9 +725,10 @@ export function BusStop({ flying, entered }: Props) {
   const live = <T,>(v: T): T => { if (!alive.current) throw new Cancelled(); return v; };
   const wait = (s: number) => new Promise<void>((r) => gsap.delayedCall(s, r)).then(live);
   const play = (t: gsap.core.Tween | gsap.core.Timeline) => new Promise<void>((r) => { t.eventCallback('onComplete', () => r()); }).then(live);
-  const tapPluck = () => new Promise<void>((r) => { waiters.current.pluck = r; }).then(live);
-  const tapNote = () => new Promise<void>((r) => { waiters.current.note = r; }).then(live);
-  const chosen = () => new Promise<string>((r) => { waiters.current.answer = r; }).then(live);
+  // (each waits for one tap, then lets go: while one is waiting, taps on the hidden messages are ignored)
+  const tapPluck = () => new Promise<void>((r) => { waiters.current.pluck = () => { waiters.current.pluck = undefined; r(); }; }).then(live);
+  const tapNote = () => new Promise<void>((r) => { waiters.current.note = () => { waiters.current.note = undefined; r(); }; }).then(live);
+  const chosen = () => new Promise<string>((r) => { waiters.current.answer = (a) => { waiters.current.answer = undefined; r(a); }; }).then(live);
   /** Waits until the day's clock reaches this hour. Nobody waits around for it, though: after a short
    *  breath the clock hurries on (the light sweeping through the hours in a few seconds) so the next
    *  moment comes right away, and then goes back to its own pace. */
@@ -762,7 +763,7 @@ export function BusStop({ flying, entered }: Props) {
       //  its tap, so sound wakes on the first tap here instead)
       window.addEventListener('pointerdown', () => unlockAudio(), { once: true });
       const f = new URLSearchParams(location.search).get('flower');
-      // (…and ?scene=bouquet&meaning opens the very last screen, the story behind it all)
+      // (…and ?scene=bouquet&meaning opens the very last screen, what everything here means)
       if (new URLSearchParams(location.search).has('meaning')) { S.blackout = true; preloadMeaning(); setUi((u) => ({ ...u, meaning: true })); return; }
       // (…and ?scene=bouquet&ask, his picture popping up to ask)
       if (new URLSearchParams(location.search).has('ask')) { S.blackout = true; preloadMeaning(); await guideReady(); setUi((u) => ({ ...u, replay: true, ask: true })); return; }
@@ -955,7 +956,7 @@ export function BusStop({ flying, entered }: Props) {
     gsap.delayedCall(1.6, () => playShimmer(1.4));
     await wait(5.4);
     setUi((u) => ({ ...u, go: true }));
-    await new Promise<void>((r) => { waiters.current.go = r; }).then(live);
+    await new Promise<void>((r) => { waiters.current.go = () => { waiters.current.go = undefined; r(); }; }).then(live);
     setUi((u) => ({ ...u, go: false }));
     buzz(12);
     gsap.to(S, { away: 1, duration: 2.6, ease: 'power1.in' });
@@ -1257,7 +1258,7 @@ export function BusStop({ flying, entered }: Props) {
     tg.opts.caret = false;
     await wait(3);
     // the very end: once the whole meadow has opened and his song has played through once (and 5 seconds
-    // more), his picture pops up and asks whether she'd like the story behind it all
+    // more), his picture pops up and asks whether she'd like to know what everything here means
     await bq.settled.then(live);
     await wait(Math.max(1, (songEnds + 5000 - performance.now()) / 1000));
     rememberEnd({ ...secretSeen }); // (so on her next visit, he can offer her the story straight away)
@@ -1441,8 +1442,7 @@ export function BusStop({ flying, entered }: Props) {
       {ui.meaning && (
         <Meaning
           found={{ ...secretSeen }}
-          read={(k) => secretText(k, 0)}
-          onClose={() => setUi((u) => ({ ...u, meaning: false, ask: false, replay: true, final: true }))}
+          onClose={() => setUi((u) => ({ ...u, meaning: false, ask: false, replay: true, final: false }))}
           onReplay={() => location.assign(location.pathname)}
         />
       )}
