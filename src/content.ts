@@ -18,8 +18,8 @@ export const content = {
     // his note, on a sheet of notebook paper
     noteTitle: 'Ek chhota sa note 📝',
     note: [
-      'Hi, it’s a small gift from my side. I know I wasn’t able to gift you something better, but still, I hope you like it. ❤️',
-      'And haan, tumhara question tha, “Gift dena hi kyun hai?” Toh uska answer yeh hai ki mujhe achha lagta hai jab koi aisa insaan khush hota hai jise main khud se bhi behtar maanta hoon. Chahe mera koi friend ho ya meri koi friend, mujhe achha lagta hai jab koi meri wajah se khush ho, ya meri wajah se uske chehre par hasi aaye. 🫶🏻',
+      'Hi, it’s a small gift from my side. I know I wasn’t able to gift you something better, but still, I hope you like it. ',
+      'And haan, i think you must ask, “Gift dena hi kyun hai?” Toh uska answer yeh hai ki mujhe achha lagta hai jab koi aisa insaan khush hota hai jise main khud se bhi behtar maanta hoon. Chahe mera koi friend ho ya meri koi friend, mujhe achha lagta hai jab koi meri wajah se khush ho, ya meri wajah se uske chehre par hasi aaye. 🫶🏻',
       'Aur haan, at least aaj ke din toh tum yeh maan hi sakti ho ki tum sab kuch deserve karti ho, okay? No arguments! 😂❤️',
       'Toh ab gift dene ka reason bhi mil gaya aur tumhare question ka answer bhi! Ab iss question ka answer dekar iss birthday wish ko sampann karte hain. 🎂✨',
       'So, answer this question, and as soon as you answer, there will be a little celebration with poppers, just for you! 🎉🎊',
@@ -27,7 +27,7 @@ export const content = {
 
     question: '19 + 9 kitna hota hai? 🤔',
     // (a cheeky line under the question)
-    questionNote: '(xerox wale ki shop pe jitna time laga tha, utna to nahi lagega… VNSGU website 😂)',
+    questionNote: '(xerox wale ki shop pe jitna time laga tha, utna to nahi lagega…? "VNSGU website" 😅)',
     placeholder: 'Answer yahaan likho',
     button: 'Submit!!',
 
