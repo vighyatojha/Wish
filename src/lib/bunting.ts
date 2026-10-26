@@ -308,44 +308,51 @@ export class Banner {
   private photo: Photo | null = null;
 
   /** Her photo, to hang on a ribbon from the fairy at the end of a row. */
+  /** resolves once her photo is ready to hang (or couldn't be had) */
+  photoReady: Promise<void> = Promise.resolve();
   setPhoto(url: string) {
     const img = new Image();
     img.decoding = 'async';
-    img.onload = () => {
-      this.photo = { img, sprite: null, row: 0, w: 0, h: 0, drop: 0, shift: 0, angle: 0, spin: 0 };
-      if (this.W > 1) this.layoutPhoto();
-    };
+    this.photoReady = new Promise<void>((res) => {
+      img.onload = () => {
+        this.photo = { img, sprite: null, row: 0, w: 0, h: 0, drop: 0, shift: 0, angle: 0, spin: 0 };
+        if (this.W > 1) this.layoutPhoto();
+        res();
+      };
+      img.onerror = () => res();
+    });
     img.src = url;
   }
 
-  /** Where her photo hangs: wide screens, from the right end of the first row, into the open sky beside
-   *  the name; tall screens, from the right end of the last row, below the words. */
+  /** Where her photo hangs: right beside her name, held on a ribbon by the fairy at the end of
+   *  "VARSHA" (the last row), level with the name; if there isn't room beside it (an upright phone),
+   *  it hangs just below the name instead. */
   private layoutPhoto() {
     const ph = this.photo;
     if (!ph || !this.rows.length) return;
     const { W, H, fw } = this;
-    const wide = W / H > 1.05;
-    ph.row = wide ? 0 : this.rows.length - 1;
+    ph.row = this.rows.length - 1;
     const row = this.rows[ph.row];
     const footX = row.cx + row.anchors[row.anchors.length - 1];
     const footY = row.y;
-    const flagsBottom = footY + fw * 2.05;             // (below the flags at the end of the row, as they swing)
     const aspect = ph.img.naturalWidth / ph.img.naturalHeight;
-    let h = wide ? H * 0.36 : Math.min(H * 0.27, W * 0.42 / aspect);
-    let top = flagsBottom + fw * 0.15;
-    if (wide && this.rows[1]) {
-      // keep clear of the next row: if they'd overlap side by side, hang below it instead
-      const r1 = this.rows[1], r1Right = r1.cx + r1.width / 2 + fw * CARRIER * 0.5;
-      if (footX - (h * aspect) / 2 < r1Right) top = Math.max(top, r1.y + fw * 1.9);
+    const margin = Math.max(10, W * 0.015);
+    // beside the name: its top a little above the fairy's hands, as big as the room to the right allows
+    // (its bottom stays above the 'tap anywhere to continue' button, low in the middle of the screen)
+    let top = footY - fw * 1.2;
+    let h = Math.min(H * 0.44, H * (H < 520 ? 0.66 : 0.72) - top, (W - margin - (footX + fw * 1.1)) / aspect);
+    let left = footX + fw * 1.1;
+    if (h < H * 0.28) {
+      // (no room beside it: hang it just below the name, centred under it)
+      h = Math.max(fw * 2.2, Math.min(H * 0.3, W * 0.5 / aspect, H * 0.97 - (footY + fw * 2.1)));
+      top = footY + fw * 2.1;
+      left = Math.min(W - margin - h * aspect, Math.max(margin, row.cx - (h * aspect) / 2));
     }
-    h = Math.max(fw * 2.2, Math.min(h, H * 0.86 - top));
     const w = h * aspect;
     ph.w = w; ph.h = h;
+    // the ribbon runs from the fairy's hands to the bow's knot
+    ph.shift = left + w * KNOT[0] - footX;
     ph.drop = top + h * KNOT[1] - footY;
-    // (stay on the screen: if hanging straight down would cut it off, the ribbon leans in a little)
-    const margin = Math.max(10, W * 0.015);
-    const knotX = footX, left = knotX - w * KNOT[0];
-    ph.shift = Math.min(0, W - margin - (left + w)) + Math.max(0, margin - left);
     // the photo with its soft shadow, drawn once at this size
     const pad = Math.ceil(fw * 0.5), dpr = this.dpr;
     const c = document.createElement('canvas');
@@ -557,7 +564,7 @@ export class Banner {
         const lean = Math.atan2(ph.shift, ph.drop);       // (if it has to lean in to stay on screen)
         g.save();
         g.translate(hx, hy);
-        g.rotate(-lean + ph.angle);
+        g.rotate(-lean + ph.angle * Math.cos(lean));
         const L = Math.hypot(ph.drop, ph.shift);
         // the ribbon
         g.strokeStyle = 'rgba(120, 112, 105, 0.5)'; g.lineWidth = Math.max(2, fw * 0.085);

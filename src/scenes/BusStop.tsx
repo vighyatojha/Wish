@@ -950,6 +950,8 @@ export function BusStop({ flying, entered }: Props) {
     // wait for the flags to be painted (fonts)
     for (let k = 0; k < 40 && !bannerRef.current; k++) await wait(0.1);
     if (!bannerRef.current) return;
+    // (her photo comes with the flags: wait for it if it's still on its way, but not for long)
+    await Promise.race([bannerRef.current.photoReady, wait(8)]).then(live);
     Object.assign(S, { banner: true, away: 0, row0: 0, row1: 0, row2: 0 });
     gsap.to(S, { row0: 1, duration: 2.6, ease: 'power3.out' });
     gsap.to(S, { row1: 1, duration: 2.6, ease: 'power3.out', delay: 0.55 });
