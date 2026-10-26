@@ -54,7 +54,6 @@ import { ButterflyArt, ButterflyRig, TulipArt, TulipRig, TULIP_TOP, TULIP_HEAD }
 import { AnimalArt, AnimalRig, ANIMAL_FEET } from '../components/Animals';
 import { Meaning, preloadMeaning } from '../components/Meaning';
 import { StoryButton, guideReady } from '../components/StoryButton';
-import { rememberEnd } from '../lib/storyMemory';
 import { Note, type NoteHandle } from '../components/Note';
 import { FairyArt, FairyRig, FAIRIES } from '../components/Fairy';
 import { loadedPictures, loadedFilm, loadedBirdsong, loadedFlowerSong, onProgress, progress, type Pictures } from '../lib/preload';
@@ -1261,7 +1260,6 @@ export function BusStop({ flying, entered }: Props) {
     // more), his picture pops up and asks whether she'd like to know what everything here means
     await bq.settled.then(live);
     await wait(Math.max(1, (songEnds + 5000 - performance.now()) / 1000));
-    rememberEnd({ ...secretSeen }); // (so on her next visit, he can offer her the story straight away)
     await guideReady().then(live);  // (his picture is long since here; this just makes sure)
     setUi((u) => ({ ...u, ask: true }));
   }

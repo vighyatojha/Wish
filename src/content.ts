@@ -147,8 +147,6 @@ export const content = {
     askLater: 'Maybe later',
     // …if she says "maybe later", his picture stays with this note; tapping it opens his explanation
     endNote: 'Whenever you’d like to know, just tap on me. 💛',
-    // the note by his picture on the first page, when she comes back to the site another time
-    revisitNote: 'Welcome back! Tap on me to see what everything here means. 💛',
     // the title of his explanation (what each thing in the scene means, and why it's there)
     cover: 'What everything here means',
     signature: '~ the bus that came to wish you',

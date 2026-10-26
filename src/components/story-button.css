@@ -33,7 +33,6 @@
   box-shadow: 3px 4px 0 rgba(0, 0, 0, 0.3);
 }
 .storybtn:focus-visible > span { outline: 2px solid #ffd98a; outline-offset: 2px; }
-.storybtn--start > span { background: #fffaf0; }
 @keyframes storybtn-in { from { opacity: 0; transform: translateY(24px) scale(0.92); } }
 @keyframes storybtn-float { to { translate: 0 -6px; } }
 /* an upright phone: above the "watch it again" button */
