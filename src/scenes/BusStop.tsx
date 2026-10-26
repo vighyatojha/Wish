@@ -632,10 +632,11 @@ export function BusStop({ flying, entered }: Props) {
     // hidden messages: tapping the moon, the stars, a firefly, the lamp or a bird (there is no hint that she can)
     const onSky = (e: PointerEvent) => {
       const el = e.target as Element | null;
-      if (el?.closest?.('.stop__hud, .stop__veil, button')) return;
-      // (never while she's meant to be tapping something else, or once her flowers have the screen)
+      if (el?.closest?.('.stop__hud, .stop__veil, .stop__question, button')) return;
+      // (not while a note is open or the whole screen is a "tap to continue", nor once her flowers have the
+      //  screen; while the question is up, or the flower waits to be plucked, the rest of the sky is hers)
       const w8 = waiters.current;
-      if (w8.note || w8.pluck || w8.answer || w8.go || S.blackout) return;
+      if (w8.note || w8.go || S.blackout) return;
       const { map, ppp, W: w, H: h } = mapRef.current;
       const x = e.clientX, y = e.clientY;
       const night = S.night > 3.2;

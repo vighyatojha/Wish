@@ -277,7 +277,8 @@ export class Life {
         g.fillStyle = '#fbffe0';
         const core = 0.8 + ff.depth * 1.6;
         g.fillRect(sx * W - core / 2, sy * H - core / 2, core, core);
-        if (a > 0.35) this.lit.push({ x: sx * W, y: sy * H, r: Math.max(32, s * 1.5) });
+        // (any firefly that's awake and at least faintly glowing can be caught, with a generous fingertip's reach)
+        if (a > 0.12) this.lit.push({ x: sx * W, y: sy * H, r: Math.max(46, s * 2.2) });
       }
       g.globalCompositeOperation = 'source-over';
       g.globalAlpha = 1;
