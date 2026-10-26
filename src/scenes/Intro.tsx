@@ -6,15 +6,15 @@
 //     marquee, a cake bouncing about, rainbow letters, a photo
 //     stuck on crooked, his note on exercise-book paper, and the
 //     question. It pops in jerkily, on purpose (nothing here is smooth).
-//  3. Right answer    → party poppers! Then rain starts (choppy, like
-//                       an old cartoon), the paper soaks, the ink runs,
-//                       and the sheet falls apart to reveal the fog scene.
+//  3. Right answer    → rain starts (its drops choppy, like an old
+//                       cartoon), the paper soaks, the ink runs, and the
+//                       sheet falls apart to reveal the fog scene.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { content } from '../content';
 import { InkText } from '../components/InkText';
 import { gsap, useGSAP, ease, dur } from '../lib/motion';
-import { unlockAudio, createRainSound, playPop, playChime } from '../lib/audio';
+import { unlockAudio, createRainSound } from '../lib/audio';
 import usPhotoUrl from '../assets/us-photo.webp';
 import { enterImmersive, keepAwake, buzz, settleViewport, prefersReducedMotion } from '../lib/device';
 import { Paper } from '../lib/paper';
@@ -42,7 +42,7 @@ interface Props {
   onDone: () => void;           // page 1 is gone
 }
 
-type Phase = 'tap' | 'question' | 'party' | 'rain';
+type Phase = 'tap' | 'question' | 'rain';
 
 export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
   const root = useRef<HTMLElement>(null);
@@ -50,7 +50,6 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const paperCanvas = useRef<HTMLCanvasElement>(null);
   const rainCanvas = useRef<HTMLCanvasElement>(null);
-  const confetti = useRef<HTMLCanvasElement>(null);
   const [typing, setTyping] = useState(false);
   const [phase, setPhase] = useState<Phase>('tap');
   const [feedback, setFeedback] = useState('');
@@ -143,70 +142,7 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
     setTyping(false);
     await settleViewport(); // wait until the page stops resizing
     await document.fonts.ready;
-    await party();           // poppers! 🎉
     requestAnimationFrame(() => startRain());
-  }
-
-  // ── 3½. A little celebration: two party poppers burst confetti up from the bottom corners ──
-  function party(): Promise<void> {
-    setPhase('party');
-    const c = confetti.current!;
-    const W = window.innerWidth, H = window.innerHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
-    c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
-    c.style.display = 'block';
-    const g = c.getContext('2d')!;
-    const shapes = ['rect', 'rect', 'circle', 'strip'] as const;
-    type Bit = { x: number; y: number; vx: number; vy: number; rot: number; spin: number; size: number; col: string; shape: typeof shapes[number] };
-    const bits: Bit[] = [];
-    const burst = (x: number, dir: number) => {
-      for (let i = 0; i < 90; i++) {
-        const a = -Math.PI / 2 + dir * (0.25 + Math.random() * 0.55), sp = (0.9 + Math.random() * 0.9) * H * 1.35;
-        bits.push({ x, y: H + 10, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, rot: Math.random() * 6, spin: (Math.random() - 0.5) * 18,
-          size: 6 + Math.random() * 9, col: rainbow[i % rainbow.length], shape: shapes[i % shapes.length] });
-      }
-    };
-    // the two poppers (emoji), popping
-    const poppers = [{ x: W * 0.08, dir: 1 }, { x: W * 0.92, dir: -1 }];
-    playPop(0.8); window.setTimeout(() => playPop(1.1), 140); window.setTimeout(playChime, 380);
-    buzz([20, 40, 20]);
-    burst(poppers[0].x, 1);
-    window.setTimeout(() => burst(poppers[1].x, -1), 140);
-    return new Promise((done) => {
-      const t0 = performance.now();
-      let last = t0, raf = 0;
-      const step = 1 / KID_FPS;
-      const frame = (now: number) => {
-        raf = requestAnimationFrame(frame);
-        if (now - last < step * 1000) return; // (jerky on purpose)
-        const dt = Math.min(0.15, (now - last) / 1000);
-        last = now;
-        const t = (now - t0) / 1000;
-        g.setTransform(dpr, 0, 0, dpr, 0, 0);
-        g.clearRect(0, 0, W, H);
-        g.font = `${Math.round(Math.min(W, H) * 0.12)}px serif`;
-        g.textAlign = 'center';
-        for (const p of poppers) {
-          const pop = t < 0.3 ? 1 + 0.4 * Math.sin((t / 0.3) * Math.PI) : 1;
-          g.save(); g.translate(p.x, H - Math.min(W, H) * 0.06); g.scale(p.dir * pop, pop); g.fillText('🎉', 0, 0); g.restore();
-        }
-        for (const b of bits) {
-          b.vy += H * 1.6 * dt; b.vx *= 0.985; b.vy *= 0.985;
-          b.x += b.vx * dt; b.y += b.vy * dt; b.rot += b.spin * dt;
-          g.save(); g.translate(b.x, b.y); g.rotate(b.rot); g.fillStyle = b.col;
-          if (b.shape === 'circle') { g.beginPath(); g.arc(0, 0, b.size * 0.4, 0, Math.PI * 2); g.fill(); }
-          else if (b.shape === 'strip') g.fillRect(-b.size * 0.15, -b.size * 0.8, b.size * 0.3, b.size * 1.6);
-          else g.fillRect(-b.size / 2, -b.size / 3, b.size, b.size * 0.66);
-          g.restore();
-        }
-        if (t > 2.8) {
-          cancelAnimationFrame(raf);
-          // the confetti stays a moment as the rain begins, then fades
-          gsap.to(c, { autoAlpha: 0, duration: 1.2, ease: 'steps(4)', delay: 1.2, onComplete: () => { c.style.display = 'none'; } });
-          done();
-        }
-      };
-      raf = requestAnimationFrame(frame);
-    });
   }
 
   // ── 4. Rain, soak, dissolve ─────────────────────────────────
@@ -257,12 +193,13 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
     let last = performance.now();
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
-      // (jerky on purpose, like an old cartoon: the rain moves on only a few times a second)
-      if (!reduced && now - last < 1000 / KID_FPS) return;
-      const dt = Math.min(0.12, (now - last) / 1000);
-      last = now;
-      rain.update(dt, st.rain, st.dissolve < 0.85);
-      rain.draw(st.tint);
+      // (the raindrops move on in little jerks, like an old cartoon; the paper soaks smoothly)
+      if (reduced || now - last >= 1000 / KID_FPS) {
+        const dt = Math.min(0.12, (now - last) / 1000);
+        last = now;
+        rain.update(dt, st.rain, st.dissolve < 0.85);
+        rain.draw(st.tint);
+      }
       sound.setLevel(st.rain);
       if (paper) {
         if (!lowRes && st.soak > 0.25) {
@@ -370,7 +307,6 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
         <InkText as="span" className="kid__deco kid__deco--3" aria-hidden="true" text="✨" />
       </div>
 
-      <canvas ref={confetti} className="layer kid__confetti" aria-hidden="true" />
       <canvas ref={paperCanvas} className="layer intro__paper" aria-hidden="true" />
       <canvas ref={rainCanvas} className="layer intro__rain" aria-hidden="true" />
     </section>

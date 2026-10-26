@@ -177,8 +177,6 @@
 /* (while she types on a phone, the keyboard takes half the screen: just the question) */
 .kid.is-typing .kid__note, .kid.is-typing .kid__photo, .kid.is-typing .kid__cake, .kid.is-typing .kid__deco { display: none; }
 
-/* the confetti from the poppers */
-.kid__confetti { display: none; z-index: 5; pointer-events: none; }
 
 /* an upright phone: one column: the marquee, her name, the question, then the note */
 @media (max-aspect-ratio: 1/1) {
