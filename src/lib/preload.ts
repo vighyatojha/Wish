@@ -126,9 +126,10 @@ export function preloadStory() {
   const pictures = Promise.all(keys.map((k) => download(PICTURES[k]).then(decoded)))
     .then((urls) => Object.fromEntries(keys.map((k, i) => [k, urls[i]])) as Pictures);
   // the film and the birdsong only start once the pictures are in, so they don't slow them down
-  // her photo comes down alongside the pictures (it's small, 40 KB, and on the bunting soon after the start)
-  const photo = download(varshaPhotoUrl);
-  const film = Promise.all([pictures, photo]).then(() => download(filmUrl));
+  // her photo right after the pictures (40 KB: a couple of seconds on its own, with nothing to share the
+  // connection with; it's needed at the bunting, half a minute after the scene starts), then the bus film
+  const photo = pictures.then(() => download(varshaPhotoUrl));
+  const film = photo.then(() => download(filmUrl));
   const birdsong = film.then(() => download(birdsongUrl));
   // the song for her flowers comes last of all: it's only needed at the very end, minutes later
   const flowerSong = birdsong.then(() => download(flowerSongUrl));
