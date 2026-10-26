@@ -16,6 +16,7 @@ import { AnimalArt } from './Animals';
 import { GrainPattern } from './CuteBird';
 import guideUrl from '../assets/guide.webp';
 import { Unfurl } from '../lib/unfurl';
+import { TypeGarden } from '../lib/typegarden';
 import dayUrl from '../assets/meaning-day.webp';
 import nightUrl from '../assets/meaning-night.webp';
 import './meaning.css';
@@ -79,6 +80,28 @@ function Panel({ crop, tilt = 0, className = '', children }: { crop: Crop; tilt?
       {children}
     </div>
   );
+}
+
+/** "Thank you", growing in roses on the page: ink letters, red roses, green stems, on the book's paper */
+function GardenWords({ text }: { text: string }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useLayoutEffect(() => {
+    let tg: TypeGarden | null = null, gone = false;
+    const timers: number[] = [];
+    void document.fonts.load('700 100px "Playfair Display"').catch(() => {}).then(() => {
+      if (gone || !ref.current) return;
+      tg = new TypeGarden(ref.current, {
+        palette: ['paper', 'transparent', '#e3344c', '#3f8a4a', '#ffe0e4', '#2b2420', '#1d4a26'],
+        transparent: true, interactive: false, caret: false, scale: 0.42, density: 0.75, legible: true,
+        maxDpr: 2, font: '"Playfair Display",Georgia,serif',
+      });
+      tg.start();
+      let at = 350;
+      for (const ch of text) { timers.push(window.setTimeout(() => tg?.type(ch), at)); at += ch === ' ' ? 300 : 210; }
+    });
+    return () => { gone = true; timers.forEach(clearTimeout); tg?.destroy(); };
+  }, [text]);
+  return <canvas ref={ref} className="book__garden" aria-label={text} role="img" />;
 }
 
 interface Props {
@@ -222,7 +245,10 @@ export function Meaning({ found, onClose, onReplay }: Props) {
               </>
             )}
             {page === thanksPage && (
-              <p className="book__caption book__caption--big">{M.thanks}</p>
+              <>
+                <GardenWords text={M.thanksGarden} />
+                <p className="book__balloon book__balloon--thanks">{M.thanks}</p>
+              </>
             )}
             {page === last && (
               <>

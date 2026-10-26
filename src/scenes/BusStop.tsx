@@ -938,9 +938,9 @@ export function BusStop({ flying, entered }: Props) {
     const cover = (Math.max(W, H) * 1.8) / (90 * sc);
     playWhoosh(1.3, 200, 3200, 0.4);
     await play(gsap.to(S.lift, { x: dx, y: dy - 60, rot: 14, scale: cover, duration: 1.15, ease: 'power2.in' }));
-    // a burst of petals, and the garden comes back
+    // a flash, the tulip's petals rain down, and the garden comes back
     gsap.timeline().to(flash.current, { autoAlpha: 0.85, duration: 0.12, ease: 'power1.out' }).to(flash.current, { autoAlpha: 0, duration: 0.9, ease: 'sine.out' });
-    lifeRef.current!.petalBurst(W / 2, H / 2, 70);
+    lifeRef.current!.petalRain(isTouch ? 90 : 130, 6); // (the tulip's petals rain down over everything)
     playPop(0.7);
     S.tulip = 0;
     await closeUp(false);

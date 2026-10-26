@@ -182,6 +182,8 @@ export const content = {
       ['#3a8fd0', 'Blue', 'calm and trust'],
       ['#7cc26a', 'The leaf', 'a new chapter'],
     ],
+    // on the thank-you page these words grow in roses (Type Garden), and the line below follows
+    thanksGarden: 'Thank you',
     thanks: 'I tried my best to make you feel at least one of these. Thank you for being here, and I hope you have a lovely day! 💛',
   },
 

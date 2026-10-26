@@ -262,3 +262,9 @@
 /* his paper: a canvas a little bigger than his picture (so the opened sheet shows around him) */
 .book__unfurl { position: absolute; inset: -12%; width: 124%; height: 124%; pointer-events: none; }
 .book__sig { position: relative; z-index: 2; }   /* (in front of his opened sheet of paper) */
+
+/* the thank-you page: "Thank you" growing in roses across the page, the line below it */
+.book__garden { display: block; width: 100%; height: clamp(120px, 26svh, 240px); }
+.book__balloon--thanks { text-align: center; }
+.book__balloon--thanks::before, .book__balloon--thanks::after { display: none; }
+@media (orientation: landscape) and (max-height: 520px) { .book__garden { height: 30svh; } }

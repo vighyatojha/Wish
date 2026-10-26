@@ -5,7 +5,7 @@
 //  • white and black birds crossing the sky (she can tap them);
 //  • fireflies rising out of the grass at dusk, wandering in the dark
 //    (and once, at the very end, gathering into a heart);
-//  • tulip petals bursting outwards;
+//  • tulip petals raining down over the whole screen;
 //  • golden dust an animal dissolves into.
 //  Garden things are pinned to the picture (they move with the
 //  camera); the swarm, petals and dust live on the screen.
@@ -68,7 +68,7 @@ interface Flyer { x: number; y: number; vx: number; vy: number; vz: number; size
 interface Bird { x: number; y: number; vx: number; size: number; phase: number; white: boolean; bob: number; sx: number; sy: number }
 interface Firefly { home: Vec2; seed: number; size: number; depth: number; th: number }
 interface HeartSpark { from: [number, number]; to: [number, number]; seed: number; delay: number }
-interface Petal { x: number; y: number; vx: number; vy: number; rot: number; spin: number; flip: number; flipRate: number; size: number; age: number; life: number; tint: number; near: boolean; seed: number }
+interface Petal { x: number; y: number; vx: number; vy: number; rot: number; spin: number; flip: number; flipRate: number; size: number; age: number; life: number; tint: number; near: boolean; seed: number; rain?: { delay: number; fall: number; sway: number } }
 interface Mote { x: number; y: number; vx: number; vy: number; r: number; g: number; b: number; delay: number; age: number; life: number; size: number; seed: number }
 
 export class Life {
@@ -192,6 +192,26 @@ export class Life {
         flip: rand(0, TAU), flipRate: rand(2, 6) * (Math.random() < 0.5 ? -1 : 1),
         size: (near ? rand(0.16, 0.26) : rand(0.04, 0.1)) * Math.min(this.W, this.H),
         age: 0, life: rand(4, 6.5), tint: i % PETAL_TINTS.length, near, seed: rand(0, 100),
+      });
+    }
+  }
+
+  /** Tulip petals raining down over the whole screen: they start just above the top, all across it,
+   *  a few at a time over `seconds`, and drift down, swaying and tumbling, at their own pace
+   *  (the bigger, nearer ones a little faster and softly out of focus). */
+  petalRain(count: number, seconds = 6) {
+    const { W, H } = this, m = Math.min(W, H);
+    for (let i = 0; i < count; i++) {
+      const near = Math.random() < 0.08;
+      const size = near ? rand(0.07, 0.11) * m : rand(0.025, 0.05) * m;
+      const fall = (near ? rand(220, 300) : rand(120, 210)) * Math.max(0.7, H / 800);
+      // the first wave is already all over the screen as the flash fades; the rest fall in from the top
+      const first = i < count * 0.4;
+      this.petals.push({
+        x: rand(-0.05, 1.05) * W, y: first ? rand(-0.05, 0.9) * H : -size - rand(0, 40), vx: 0, vy: fall, rot: rand(0, TAU), spin: rand(-1.6, 1.6),
+        flip: rand(0, TAU), flipRate: rand(1.5, 4) * (Math.random() < 0.5 ? -1 : 1), size,
+        age: 0, life: (H + size * 2 + 80) / fall + 1, tint: i % PETAL_TINTS.length, near, seed: rand(0, 100),
+        rain: { delay: first ? rand(0, 0.25) : ((i - count * 0.4) / (count * 0.6)) * seconds + rand(0, 0.4), fall, sway: rand(14, 40) },
       });
     }
   }
@@ -380,10 +400,17 @@ export class Life {
 
     // ── petals: thrown out fast, then tumbling and drifting down ──
     for (const p of this.petals) {
+      if (p.rain && p.rain.delay > 0) { p.rain.delay -= dt; continue; }
       p.age += dt;
-      const drag = Math.min(1, dt * (p.age < 0.6 ? 3.2 : 1.6));
-      p.vx += (-p.vx * drag) + Math.sin(time * 2 + p.seed) * 60 * dt;
-      p.vy += (-p.vy * drag) + 110 * dt;
+      if (p.rain) {
+        // falling steadily, swaying side to side, with a light breeze
+        p.vx = Math.sin(time * 1.2 + p.seed) * p.rain.sway + 12;
+        p.vy = p.rain.fall * (0.85 + 0.15 * Math.sin(time * 2.1 + p.seed * 3));
+      } else {
+        const drag = Math.min(1, dt * (p.age < 0.6 ? 3.2 : 1.6));
+        p.vx += (-p.vx * drag) + Math.sin(time * 2 + p.seed) * 60 * dt;
+        p.vy += (-p.vy * drag) + 110 * dt;
+      }
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.rot += p.spin * dt;
@@ -391,10 +418,10 @@ export class Life {
       const flipC = Math.cos(p.flip);
       const sprites = petalSprites(p.tint);
       const img = p.near ? sprites.soft : flipC > 0 ? sprites.front : sprites.back;
-      const a = clamp(Math.min(p.age * 6, (p.life - p.age) / 1.2));
+      const a = p.rain ? clamp(p.age * 3) : clamp(Math.min(p.age * 6, (p.life - p.age) / 1.2));
       const c = p.near ? f : g;
       c.save();
-      c.globalAlpha = a * (p.near ? 0.85 : 1);
+      c.globalAlpha = a * (p.near ? (p.rain ? 0.6 : 0.85) : 1);
       c.translate(p.x, p.y);
       c.rotate(p.rot);
       c.scale(Math.max(0.12, Math.abs(flipC)), 1);
