@@ -10,25 +10,42 @@ export const content = {
   // ── Page 1: the white page ──────────────────────────────────
   intro: {
     tapPrompt: 'Turn your sound on, then tap anywhere to begin.',
+    // (page 1 looks like a little kid made it: a marquee, a wobbly cake, rainbow words)
+    marquee: '🎉 HAPPY BIRTHDAY VARSHA 🎂 HAPPY BIRTHDAY VARSHA 🎈',
     greeting: 'Happy birthday,',
+    photoCaption: 'us 😎',
 
-    question: 'What’s the one thing that’s never missing on your birthday?',
-    placeholder: 'Type your answer',
-    button: 'Answer',
+    // his note, on a sheet of notebook paper
+    noteTitle: 'Ek chhota sa note 📝',
+    note: [
+      'Hi, it’s a small gift from my side. I know I wasn’t able to gift you something better, but still, I hope you like it. ❤️',
+      'And haan, tumhara question tha, “Gift dena hi kyun hai?” Toh uska answer yeh hai ki mujhe achha lagta hai jab koi aisa insaan khush hota hai jise main khud se bhi behtar maanta hoon. Chahe mera koi friend ho ya meri koi friend, mujhe achha lagta hai jab koi meri wajah se khush ho, ya meri wajah se uske chehre par hasi aaye. 🫶🏻',
+      'Aur haan, at least aaj ke din toh tum yeh maan hi sakti ho ki tum sab kuch deserve karti ho, okay? No arguments! 😂❤️',
+      'Toh ab gift dene ka reason bhi mil gaya aur tumhare question ka answer bhi! Ab iss question ka answer dekar iss birthday wish ko sampann karte hain. 🎂✨',
+      'So, answer this question, and as soon as you answer, there will be a little celebration with poppers, just for you! 🎉🎊',
+    ],
 
-    // Any of these is accepted. Capitals, spaces and punctuation
-    // are ignored, so "Cake!" and " cake " both count as "cake".
-    answers: ['cake', 'a cake', 'birthday cake'],
+    question: '19 + 9 kitna hota hai? 🤔',
+    // (a cheeky line under the question)
+    questionNote: '(xerox wale ki shop pe jitna time laga tha, utna to nahi lagega… VNSGU website 😂)',
+    placeholder: 'Answer yahaan likho',
+    button: 'Submit!!',
 
-    wrongMessage: 'That’s not it. Try again.',
+    // Any of these is accepted. Capitals, spaces and punctuation are ignored.
+    answers: ['28', 'twenty eight', 'twentyeight', 'atthais', 'athais', 'athhais', 'atthaees', 'athaees', 'अट्ठाईस', 'अठाईस'],
+
+    wrongMessage: 'Galat! 😜 Ek baar aur try karo.',
 
     // Hints appear one by one after each wrong answer.
-    hints: ['Hint: it has candles on it.', 'Hint: you cut it, and everyone sings.'],
+    hints: [
+      'Hint: 20 se ek kam, plus 9… 🧮',
+      'Hint: 30 se 2 kam! 🙈',
+    ],
 
     // After this many wrong answers she gets in anyway,
     // so she can never get stuck on the first page.
     letInAfter: 5,
-    letInMessage: 'Close enough. Come in.',
+    letInMessage: 'Chalo, close enough! Andar aao. 😄',
   },
 
   // ── Page 2: the bus stop ────────────────────────────────────
