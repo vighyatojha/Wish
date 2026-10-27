@@ -49,8 +49,10 @@ export const Note = forwardRef<NoteHandle, Props>(function Note({ title, message
     if (!c) return;
     void document.fonts.load('700 100px "Playfair Display"').catch(() => {}).then(() => {
       garden.current = new TypeGarden(c, {
-        palette: ['parchment', 'transparent', '#d8324a', '#3d7a3a', '#ffe0e4', '#3b2414', '#1d4a26'],
-        transparent: true, interactive: false, caret: false, scale: 0.72, density: 0.7, legible: true,
+        palette: ['parchment', 'transparent', '#d8324a', '#3d7a3a', '#fff4ea', '#3b2414', '#1d4a26'],
+        // (roses in several colours: red, pink, yellow, peach, lilac)
+        flowers: ['#d8324a', '#f2789f', '#f2b92e', '#f39a6b', '#a77fd8'],
+        transparent: true, interactive: false, caret: false, scale: 0.36, density: 0.7, legible: true,
         maxDpr: 2, font: '"Playfair Display",Georgia,serif',
       });
       garden.current.start();
@@ -70,8 +72,7 @@ export const Note = forwardRef<NoteHandle, Props>(function Note({ title, message
     if (!p || !t) return;
     t.style.fontSize = '';
     let size = parseFloat(getComputedStyle(t).fontSize);
-    const room = () => p.clientHeight - (p.scrollHeight - t.offsetHeight) ;
-    for (let i = 0; i < 30 && (p.scrollHeight > p.clientHeight + 1 || t.offsetHeight > room()) && size > 12; i++) {
+    for (let i = 0; i < 30 && p.scrollHeight > p.clientHeight + 1 && size > 12; i++) {
       size *= 0.93; t.style.fontSize = `${size}px`;
     }
   };

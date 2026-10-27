@@ -12,6 +12,8 @@ export interface GardenOptions {
   legible?: boolean;
   maxDpr?: number;
   font?: string;
+  /** several rose colours: each rose takes one */
+  flowers?: string[];
 }
 export declare class TypeGarden {
   static PAL: GardenPalette[];

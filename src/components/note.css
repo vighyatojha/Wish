@@ -45,7 +45,7 @@
 }
 
 /* the title, growing in roses at the top of the paper */
-.note__heading { display: block; width: 96%; height: clamp(80px, 25%, 200px); margin: -2% 0 -0.6rem; }
+.note__heading { display: block; width: 100%; height: clamp(110px, 36%, 300px); margin: -4% 0 -1.2rem; }
 
 .note__text {
   margin: 0;
@@ -99,3 +99,10 @@
 .note__roller--bottom { bottom: 0; }
 
 @media (prefers-reduced-motion: reduce) { .note__hint { animation: none; } }
+/* (a phone held sideways is short: a smaller title, so the message keeps its size) */
+@media (orientation: landscape) and (max-height: 520px) {
+  .note__heading { height: max(64px, 28%); margin: -3% 0 -0.6rem; }
+  .note__paper { padding: 2.5% 7% 5%; gap: 0.25rem; }
+  .note__text { font-size: clamp(1.15rem, 6.5svh, 1.6rem); }
+  .note__flourish { width: 24%; }
+}

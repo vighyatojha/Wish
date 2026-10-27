@@ -19,6 +19,8 @@
 //    options.density     how leafy and bridged the garden is (0.5–1.6, default 1)
 //    options.scale       type size as a share of the canvas height (default 0.28)
 //    options.legible     roses over a letter always go behind it (default false, like the original)
+//    options.flowers     several rose colours, e.g. ['#e8324a', '#ff8fb1', '#f6c12e']: each rose takes one
+//                        (default: just the palette's flower colour)
 // ─────────────────────────────────────────────────────────────
 
 export class TypeGarden {
@@ -461,6 +463,7 @@ export class TypeGarden {
     if (L > 6) { const v = []; for (let i = 0; i <= 8; i++) v.push(ax(0.08 + 0.72 * i / 8)); B.stroke(v, this.cc.vein, Math.max(0.8, L * 0.03)); }
   }
   rose(B, cx, cy, R, rot, e, a, tl) {
+    const fl = this.opts.flowers, roseCol = fl && fl.length ? fl[(Math.abs(e.id * 7 + 3)) % fl.length] : this.cc.red;
     const cr = Math.cos(rot), sr = Math.sin(rot);
     const tm = tl ? Math.hypot(tl[0], tl[1]) : 0, ux = tm ? tl[0] / tm : 0, uy = tm ? tl[1] / tm : 0, sq = -0.28 * tm;
     const T = (x, y, z = 0) => {
@@ -488,7 +491,7 @@ export class TypeGarden {
         return T((ax0 + (px - ax0) * s) * R, (ay0 + (py - ay0) * s) * R, q[5]);
       };
       const pts = []; for (let k = 0; k < 26; k++) pts.push(pt(k / 26 * Math.PI * 2));
-      B.fill(pts, this.cc.red);
+      B.fill(pts, roseCol);
       if (q[6] && R >= 12 && s > 0.4) {
         const arc = []; for (let k = 0; k <= 14; k++) arc.push(pt(Math.PI * (1.18 + 0.64 * k / 14)));
         this.strokeRange(B, arc, 0, Math.min(1, (s - 0.4) / 0.5), this.cc.line, lw * 0.8);
