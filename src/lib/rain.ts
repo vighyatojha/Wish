@@ -25,6 +25,33 @@ export class Rain {
   private splashes: Splash[] = [];
   private spawnDebt = 0;
   private onResize = () => this.resize();
+  /** a raindrop as the eye (or a camera) sees it: a thin streak, faint at the top, with a light
+   *  core and darker edges (light bending through water); one sharp, one soft for drops near the lens */
+  private streaks: HTMLCanvasElement[] = [];
+  private streakTint = -1;
+  private makeStreaks(tint: number) {
+    const r = Math.round(70 + 150 * tint), gg = Math.round(88 + 140 * tint), b = Math.round(118 + 120 * tint);
+    const make = (w: number, blur: number) => {
+      const c = document.createElement('canvas'); c.width = w; c.height = 96;
+      const g = c.getContext('2d')!;
+      if (blur) g.filter = `blur(${blur}px)`;
+      const m = w / 2, half = Math.max(0.7, w / 2 - blur * 2 - 0.2);
+      const lg = g.createLinearGradient(0, 0, 0, 96);
+      lg.addColorStop(0, `rgba(${r},${gg},${b},0)`);
+      lg.addColorStop(0.55, `rgba(${r},${gg},${b},0.55)`);
+      lg.addColorStop(1, `rgba(${r},${gg},${b},0.95)`);
+      g.fillStyle = lg;
+      g.beginPath(); g.ellipse(m, 48, half, 46, 0, 0, Math.PI * 2); g.fill();
+      // the bright core (a glint of light inside the drop)
+      const core = g.createLinearGradient(0, 0, 0, 96);
+      core.addColorStop(0, 'rgba(255,255,255,0)'); core.addColorStop(1, `rgba(255,255,255,${0.55 - tint * 0.2})`);
+      g.fillStyle = core;
+      g.beginPath(); g.ellipse(m, 52, half * 0.38, 40, 0, 0, Math.PI * 2); g.fill();
+      return c;
+    };
+    this.streaks = [make(6, 0), make(18, 3.5)];
+    this.streakTint = tint;
+  }
 
   constructor(private canvas: HTMLCanvasElement, private onImpact?: ImpactHandler, private density = 1) {
     this.g = canvas.getContext('2d')!;
@@ -42,26 +69,27 @@ export class Rain {
 
   private spawn(): void {
     const { W, H } = this;
-    const depth = Math.random(); // 0 far … 1 near
-    const speed = rand(1300, 2100) * (0.75 + depth * 0.45);
-    const len = rand(14, 26) * (0.7 + depth * 0.8);
+    const depth = Math.random() ** 1.6; // 0 far … 1 near (most drops are far)
+    const speed = rand(1500, 2300) * (0.55 + depth * 0.6);
+    // (a falling drop is seen as a streak about as long as it falls in 1/30 s)
+    const len = speed / 30 * rand(0.8, 1.2) * Math.max(0.6, H / 900);
     this.drops.push({
       x: rand(-0.15 * W, W * 1.02),
       y: -len - Math.random() * H * 0.25,
       vy: speed,
-      vx: speed * 0.11, // a little wind
+      vx: speed * 0.13, // a little wind
       len,
       depth,
-      hitY: Math.random() < 0.78 ? rand(0.02, 1.0) * H : Infinity, // most land on the paper
+      hitY: Math.random() < 0.3 ? rand(0.02, 1.0) * H : Infinity, // (enough land on the paper to soak it; the rest fall past)
     });
   }
 
   private splash(x: number, y: number, depth: number): void {
-    const s: Splash = { x, y, t: 0, r: rand(3, 7) * (0.6 + depth * 0.7), bits: [] };
-    const n = 2 + Math.floor(Math.random() * 3);
+    const s: Splash = { x, y, t: 0, r: rand(2, 5) * (0.5 + depth * 0.8), bits: [] };
+    const n = 3 + Math.floor(Math.random() * 3);
     for (let i = 0; i < n; i++) {
-      const a = rand(Math.PI * 1.1, Math.PI * 1.9); // mostly upwards
-      const v = rand(40, 110);
+      const a = rand(Math.PI * 1.15, Math.PI * 1.85); // a little crown, mostly upwards
+      const v = rand(50, 140) * (0.6 + depth * 0.6);
       s.bits.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v });
     }
     this.splashes.push(s);
@@ -69,7 +97,7 @@ export class Rain {
 
   // intensity 0 → 1. impacts = false lets drops fall without splashing.
   update(dt: number, intensity: number, impacts = true): void {
-    const rate = intensity < 0.01 ? 0 : (6 + 170 * intensity * intensity) * this.density;
+    const rate = intensity < 0.01 ? 0 : (10 + 420 * intensity * intensity) * this.density;
     this.spawnDebt += rate * dt;
     while (this.spawnDebt >= 1) {
       this.spawn();
@@ -99,44 +127,44 @@ export class Rain {
         b.y += b.vy * dt;
         b.vy += 600 * dt;
       }
-      if (s.t > 0.32) splashes.splice(i, 1);
+      if (s.t > 0.26) splashes.splice(i, 1);
     }
   }
 
   // tint 0 = dark rain (over the white page) → 1 = pale rain (over fog)
   draw(tint = 0): void {
     const { g, dpr, W, H } = this;
+    if (Math.abs(tint - this.streakTint) > 0.04) this.makeStreaks(tint);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
-    const r = Math.round(96 + 134 * tint), gg = Math.round(116 + 122 * tint), b = Math.round(150 + 100 * tint);
-    g.lineCap = 'round';
 
-    // three depth layers, so styles are only set three times per frame
-    for (let layer = 0; layer < 3; layer++) {
-      const lo = layer / 3, hi = (layer + 1) / 3;
-      g.beginPath();
-      for (const d of this.drops) {
-        if (d.depth < lo || d.depth >= hi) continue;
-        const k = d.len / d.vy;
-        g.moveTo(d.x - d.vx * k, d.y - d.len);
-        g.lineTo(d.x, d.y);
-      }
-      g.strokeStyle = `rgba(${r},${gg},${b},${0.22 + layer * 0.14})`;
-      g.lineWidth = 0.8 + layer * 0.45;
-      g.stroke();
+    // each drop: its streak, turned along the way it's falling; far drops thin and faint,
+    // near ones longer and stronger, the very nearest soft and blurred (out of focus)
+    for (const d of this.drops) {
+      const near = d.depth > 0.85;
+      const img = near ? this.streaks[1] : this.streaks[0];
+      const ang = Math.atan2(d.vx, d.vy);
+      const w = near ? 6 + d.depth * 6 : 0.9 + d.depth * 2.2;
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      g.globalAlpha = near ? 0.32 : 0.24 + d.depth * 0.6;
+      g.setTransform(ca * dpr, -sa * dpr, sa * dpr, ca * dpr, d.x * dpr, d.y * dpr);
+      g.drawImage(img, -w / 2, -d.len, w, d.len);
     }
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.globalAlpha = 1;
 
+    const r = Math.round(70 + 150 * tint), gg = Math.round(88 + 140 * tint), b = Math.round(118 + 120 * tint);
     for (const s of this.splashes) {
-      const p = s.t / 0.32;
-      const a = (1 - p) * 0.55;
+      const p = s.t / 0.26;
+      const a = (1 - p) * 0.45;
       g.strokeStyle = g.fillStyle = `rgba(${r},${gg},${b},${a})`;
-      g.lineWidth = 1;
+      g.lineWidth = 0.8;
       g.beginPath();
-      g.ellipse(s.x, s.y, s.r * (0.3 + p), s.r * (0.3 + p) * 0.45, 0, 0, Math.PI * 2);
+      g.ellipse(s.x, s.y, s.r * (0.4 + p * 1.2), s.r * (0.4 + p * 1.2) * 0.35, 0, 0, Math.PI * 2);
       g.stroke();
       for (const bit of s.bits) {
         g.beginPath();
-        g.arc(bit.x, bit.y, 1.1, 0, Math.PI * 2);
+        g.arc(bit.x, bit.y, 0.8, 0, Math.PI * 2);
         g.fill();
       }
     }

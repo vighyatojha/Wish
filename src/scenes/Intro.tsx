@@ -6,9 +6,8 @@
 //     marquee, a cake bouncing about, rainbow letters, a photo
 //     stuck on crooked, his note on exercise-book paper, and the
 //     question. It pops in jerkily, on purpose (nothing here is smooth).
-//  3. Right answer    → rain starts (its drops choppy, like an old
-//                       cartoon), the paper soaks, the ink runs, and the
-//                       sheet falls apart to reveal the fog scene.
+//  3. Right answer    → rain starts, the paper soaks, the ink runs, and
+//                       the sheet falls apart to reveal the fog scene.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { content } from '../content';
@@ -27,8 +26,6 @@ import './intro.css';
 
 const copy = content.intro;
 
-/** the "kid-made" look: things move in jerky steps, this many frames a second */
-const KID_FPS = 12;
 const rainbow = ['#e8232c', '#f28c18', '#e5c000', '#2eaa45', '#1f7fe0', '#7b3fd6', '#e0399e'];
 
 // Ignore capitals, accents, punctuation and extra spaces.
@@ -193,13 +190,10 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
     let last = performance.now();
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
-      // (the raindrops move on in little jerks, like an old cartoon; the paper soaks smoothly)
-      if (reduced || now - last >= 1000 / KID_FPS) {
-        const dt = Math.min(0.12, (now - last) / 1000);
-        last = now;
-        rain.update(dt, st.rain, st.dissolve < 0.85);
-        rain.draw(st.tint);
-      }
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      rain.update(dt, st.rain, st.dissolve < 0.85);
+      rain.draw(st.tint);
       sound.setLevel(st.rain);
       if (paper) {
         if (!lowRes && st.soak > 0.25) {
