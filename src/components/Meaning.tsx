@@ -26,7 +26,8 @@ const HIDDEN: HiddenKind[] = ['moon', 'stars', 'fireflies', 'lamp', 'birds'];
 
 /** Start fetching the pictures early (they're small): call once the end is near. */
 export function preloadMeaning(): void {
-  for (const u of [guideUrl, dayUrl, nightUrl]) { const i = new Image(); i.decoding = 'async'; i.src = u; }
+  fetchPictures();
+  const g = new Image(); g.decoding = 'async'; g.src = guideUrl;
 }
 
 // Each panel is a piece of one of the two pictures of the scene (day, night: 1600×900),
@@ -51,7 +52,36 @@ const PANELS: Record<string, Crop> = {
   h_birds: { img: 'day', r: [0.1, 0, 0.42, 0.26], extra: 'birds' },
 };
 
+/** whether each of the two pictures has arrived (they're small, but on a slow connection it can take a moment) */
+const arrived: Record<'day' | 'night', boolean> = { day: false, night: false };
+const waiting = new Set<() => void>();
+let fetching = false;
+/** starts fetching the two pictures (once); only called near the end, never while the scene loads */
+function fetchPictures() {
+  if (fetching) return;
+  fetching = true;
+  for (const [k, u] of [['day', dayUrl], ['night', nightUrl]] as const) {
+    const i = new Image();
+    i.decoding = 'async';
+    i.onload = () => { arrived[k] = true; waiting.forEach((f) => f()); };
+    i.onerror = () => { arrived[k] = true; waiting.forEach((f) => f()); }; // (don't shimmer forever)
+    i.src = u;
+  }
+}
+function useArrived(k: 'day' | 'night') {
+  const [ok, setOk] = useState(arrived[k]);
+  useLayoutEffect(() => {
+    if (ok) return;
+    fetchPictures();
+    const f = () => { if (arrived[k]) setOk(true); };
+    waiting.add(f); f();
+    return () => { waiting.delete(f); };
+  }, [k, ok]);
+  return ok;
+}
+
 function Panel({ crop, tilt = 0, className = '', children }: { crop: Crop; tilt?: number; className?: string; children?: React.ReactNode }) {
+  const ready = useArrived(crop.img);
   const [x0, y0, x1, y1] = crop.r, w = x1 - x0, h = y1 - y0;
   const style: CSSProperties = {
     backgroundImage: `url(${crop.img === 'day' ? dayUrl : nightUrl})`,
@@ -61,7 +91,7 @@ function Panel({ crop, tilt = 0, className = '', children }: { crop: Crop; tilt?
     rotate: `${tilt}deg`,
   };
   return (
-    <div className={`book__panel ${className}`} style={style}>
+    <div className={`book__panel ${ready ? '' : 'is-loading '}${className}`} style={style}>
       {crop.extra === 'birds' && (
         <div className="book__birds" aria-hidden="true">
           {[0, 1, 2, 3, 4].map((i) => (
@@ -91,7 +121,8 @@ function GardenWords({ text }: { text: string }) {
     void document.fonts.load('700 100px "Playfair Display"').catch(() => {}).then(() => {
       if (gone || !ref.current) return;
       tg = new TypeGarden(ref.current, {
-        palette: ['paper', 'transparent', '#e3344c', '#3f8a4a', '#ffe0e4', '#2b2420', '#1d4a26'],
+        palette: ['paper', 'transparent', '#e3344c', '#3f8a4a', '#fff4ea', '#2b2420', '#1d4a26'],
+        flowers: ['#e3344c', '#f2789f', '#f2b92e', '#f39a6b', '#a77fd8'],
         transparent: true, interactive: false, caret: false, scale: 0.42, density: 0.75, legible: true,
         maxDpr: 2, font: '"Playfair Display",Georgia,serif',
       });

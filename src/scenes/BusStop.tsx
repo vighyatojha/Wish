@@ -759,6 +759,8 @@ export function BusStop({ flying, entered }: Props) {
     // once the story's own files are in (pictures, bus film, birdsong), fetch the middle flower of each kind,
     // so whichever she chooses has its first flower ready long before the end
     void loadedBirdsong().then(preloadFlowers, preloadFlowers);
+    // (his book's pictures too, once everything else is in: they're needed only at the very end)
+    void loadedFlowerSong().then(preloadMeaning, preloadMeaning);
     if (skip === 'bouquet') {
       // (for building: ?scene=bouquet&flower=Lily goes straight to the last gift; skipping the first page skips
       //  its tap, so sound wakes on the first tap here instead)
@@ -1253,7 +1255,7 @@ export function BusStop({ flying, entered }: Props) {
     await document.fonts.load('700 100px "Playfair Display"').catch(() => {});
     // (the roses take the colour of her flowers; green stems, white letters)
     const rose = { Tulip: '#ff2e4d', Lily: '#ff5a3c', Lotus: '#ff6f9f' }[kind];
-    const tg = new TypeGarden(gc, { palette: ['night', 'transparent', rose, '#3f9a52', '#ffe2e8', '#f7f4ff', '#06210f'], transparent: true, interactive: false, caret: true, scale: 0.3, density: 0.7, legible: true, maxDpr: isTouch ? 1.5 : 2, font: '"Playfair Display",Georgia,serif' });
+    const tg = new TypeGarden(gc, { palette: ['night', 'transparent', rose, '#3f9a52', '#fff4ea', '#f7f4ff', '#06210f'], flowers: [rose, '#ff8fb1', '#f6c12e', '#f39a6b', '#b48cf0'], transparent: true, interactive: false, caret: true, scale: 0.3, density: 0.7, legible: true, maxDpr: isTouch ? 1.5 : 2, font: '"Playfair Display",Georgia,serif' });
     gardenRef.current = tg;
     tg.start();
     for (const ch of content.finale.gardenWords) { tg.type(ch); await wait(ch === ' ' ? 0.32 : 0.2); }
