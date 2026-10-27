@@ -23,7 +23,8 @@
   align-content: center;
   justify-items: center;
   gap: 0.6rem;
-  padding: 7% 9%;
+  padding: 6% 9% 9%;
+  overflow: hidden;
   color: #3b2414;
   text-align: center;
   background:
@@ -42,6 +43,9 @@
   border-radius: 4px;
   pointer-events: none;
 }
+
+/* the title, growing in roses at the top of the paper */
+.note__heading { display: block; width: 96%; height: clamp(80px, 25%, 200px); margin: -2% 0 -0.6rem; }
 
 .note__text {
   margin: 0;

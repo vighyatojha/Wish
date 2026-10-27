@@ -1375,7 +1375,7 @@ export function BusStop({ flying, entered }: Props) {
         </svg>
       </button>
 
-      <Note ref={note} message={CARDS[noteIndex].message} hint={content.noteHint} onTap={() => waiters.current.note?.()} />
+      <Note ref={note} title={CARDS[noteIndex].title} message={CARDS[noteIndex].message} hint={content.noteHint} onTap={() => waiters.current.note?.()} />
 
       {/* under the bunting: tap anywhere to go on */}
       {ui.go && (
