@@ -118,14 +118,13 @@ export const content = {
   // One animal at a time steps off the bus with a scroll for her,
   // spread across the day (the clock runs 6 AM → 9 PM in about 3½ minutes). These are placeholders:
   // replace them with your own words (a sentence or two each).
-  // Each scroll: a `title` that grows in roses at the top (keep it short: 1–3 words) and its `message`
-  // (the message shrinks to fit if it's long, but around 20 words reads best).
+  // Each scroll's message (it shrinks to fit if it's long, but around 20 words reads best).
   animals: [
-    { animal: 'bunny', title: 'Keep Growing', message: 'Bloom where you are planted, and keep growing towards the light.' },
-    { animal: 'fox', title: 'Be Brave', message: 'What lies within you is stronger than anything that stands before you.' },
-    { animal: 'duckling', title: 'New Dawn', message: 'Every sunset is a promise that a new dawn is on its way.' },
-    { animal: 'hedgehog', title: 'Little Things', message: 'Do small things with great love; one day they become the big things.' },
-    { animal: 'squirrel', title: 'Shine On', message: 'Stars can’t shine without darkness. So shine.' },
+    { animal: 'bunny', message: 'Bloom where you are planted, and keep growing towards the light.' },
+    { animal: 'fox', message: 'What lies within you is stronger than anything that stands before you.' },
+    { animal: 'duckling', message: 'Every sunset is a promise that a new dawn is on its way.' },
+    { animal: 'hedgehog', message: 'Do small things with great love; one day they become the big things.' },
+    { animal: 'squirrel', message: 'Stars can’t shine without darkness. So shine.' },
   ],
   noteHint: 'tap the note to close it',
   // shown in the fog only if page 2's pictures (or the bus film) are still downloading
