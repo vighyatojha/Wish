@@ -174,8 +174,11 @@
 .kid__deco--3 { left: 48%; top: 14%; animation-duration: 1.3s; }
 @keyframes kid-wiggle { from { rotate: -12deg; } to { rotate: 12deg; } }
 
-/* (while she types on a phone, the keyboard takes half the screen: just the question) */
-.kid.is-typing .kid__note, .kid.is-typing .kid__photo, .kid.is-typing .kid__cake, .kid.is-typing .kid__deco { display: none; }
+/* (while she types on a phone held upright, the keyboard takes half the screen: just the question.
+    On a laptop, or a phone held sideways, everything stays.) */
+@media (pointer: coarse) and (max-aspect-ratio: 1/1) {
+  .kid.is-typing .kid__note, .kid.is-typing .kid__photo, .kid.is-typing .kid__cake, .kid.is-typing .kid__deco { display: none; }
+}
 
 
 /* an upright phone: one column: the marquee, her name, the question, then the note */
@@ -191,7 +194,7 @@
   .kid__note { --rule: 21px; align-self: stretch; width: auto; padding-left: 2.2rem; }
 
   .kid__photo { right: 5%; left: auto; top: 13%; bottom: auto; width: 26vw; }
-  .kid.is-typing { grid-template-rows: auto auto; }
+
 }
 /* a phone held sideways: smaller everything */
 @media (orientation: landscape) and (max-height: 520px) {
@@ -209,6 +212,7 @@
   .kid__photo { width: 60px; left: auto; right: calc(50% + 0.3rem); bottom: 4%; }
   .kid__cake { font-size: 2.2rem; }
 }
+@media (pointer: coarse) and (max-aspect-ratio: 1/1) { .kid.is-typing { grid-template-rows: auto auto; } }
 @media (prefers-reduced-motion: reduce) {
   .kid__marquee-text, .kid__cake, .kid__deco { animation: none; }
 }
