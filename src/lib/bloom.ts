@@ -140,7 +140,9 @@ interface Head { vi: number; star: boolean; waited: number; art?: Art; main: boo
   /** where the flower is (its stem is worked out from here and where it starts) */
   abs?: P2;
   /** (lilies) it branches off the main stem this far up it, rather than rising from the ground */
-  branch?: number }
+  branch?: number;
+  /** how far the wind has it leaning just now (it follows the gust, a little behind) */
+  wind?: number }
 /** something under the ground (or the water), drawn as glowing lines: it grows from t0 over dur */
 interface Under { t0: number; dur: number; draw: (p: number, a: number) => void }
 /** a lotus leaf: floating flat on the water, or held up above it on its own stalk */
@@ -506,7 +508,7 @@ export class Bloom {
   private hint = 0;
   private draw(t: number, held?: Head) {
     const { W, H, dpr } = this;
-    const dt = Math.max(0, t - this.lastT); this.lastT = t;
+    const dt = Math.max(0, t - this.lastT); this.lastT = t; this.fdt = Math.min(0.1, dt);
     // the song's pulse: quick to rise, slower to fall (without a song: a slow breath)
     const raw = this.pulse();
     const target = raw ?? (0.25 + 0.25 * Math.sin(t * 1.6));
@@ -795,7 +797,7 @@ export class Bloom {
       if (k <= 0.01) continue;
       // a blade arcs up and over to one side, like a quarter circle, fading into the dark at its foot
       const side = i % 2 ? 1 : -1, L = U * h.size * (0.7 + 0.3 * ((h.seed * (i + 3)) % 1)) * k;
-      const sway = Math.sin(t * 0.7 + h.seed + i) * 0.04 * L + this.gust(t, h.root) * 0.22 * L;
+      const sway = Math.sin(t * 0.7 + h.seed + i) * 0.04 * L + this.gust(t, h.root) * 0.16 * L;
       const bx = at[0] + side * L * 0.02, by = at[1] + L * 0.25; // (its foot, a little below the stem's: in the dark)
       const ex = bx + side * L * (0.55 + 0.1 * i) + sway, ey = by - L * (0.95 - 0.12 * i);
       const lg = g.createLinearGradient(0, by, 0, ey);
@@ -818,10 +820,13 @@ export class Bloom {
         h.root = (bx - ox) / U; h.gy = (by - oy) / U; h.tip = [h.abs![0] - h.root, h.abs![1] - h.gy];
       }
       const after = clamp((t - h.t0 - h.dur) / 2);
-      const wind = this.gust(t, h.root + h.tip[0]) * after;
+      // (each stem follows the wind with a little lag, as a real stem would: no sudden moves)
+      const want = this.gust(t, h.root + h.tip[0]) * after;
+      h.wind = (h.wind ?? 0) + (want - (h.wind ?? 0)) * (1 - Math.exp(-this.fdt * 2.2));
+      const wind = h.wind;
       const sw = h.field
-        ? Math.sin(t * 0.6 + h.seed) * 0.03 * after + wind * 0.11 * (0.6 + 0.4 * h.thin)
-        : Math.sin(t * 0.8 + h.seed) * 0.016 * clamp(t - h.t0 - h.dur) + wind * 0.05;
+        ? Math.sin(t * 0.6 + h.seed) * 0.03 * after + wind * 0.075 * (0.6 + 0.4 * h.thin)
+        : Math.sin(t * 0.8 + h.seed) * 0.016 * clamp(t - h.t0 - h.dur) + wind * 0.035;
       const ca = Math.cos(sw), sa = Math.sin(sw);
       const rot = (q: P2): P2 => [q[0] * ca - q[1] * sa, q[0] * sa + q[1] * ca];
       const tip = rot(h.tip), c1 = rot([h.tip[0] * 0.08 + h.bow, h.tip[1] * 0.35]), c2 = rot([h.tip[0] * 0.8 + h.bow * 1.3, h.tip[1] * 0.72]);
@@ -879,9 +884,12 @@ export class Bloom {
     const reach = this.W / 2 / this.U + 1;
     const T = t - this.spreadAt - 10;
     if (T < 0) return 0;
-    const front = (T % 8) * ((reach * 2 + 1.5) / 3.2) - reach - 0.4;
+    // (a broad, slow wave of air: about 7 seconds to cross the screen, one every 12 seconds,
+    //  and it eases in over the first few seconds rather than starting all at once)
+    const front = ((T % 12) / 7) * (reach * 2 + 3) - reach - 1.5;
     const d = x - front;
-    return Math.exp(-(d * d) / 0.3) - 0.4 * Math.exp(-((d + 0.75) ** 2) / 0.35);
+    const bump = (v: number) => (Math.abs(v) >= 1 ? 0 : 0.5 + 0.5 * Math.cos(Math.PI * v)); // (smooth to the very edges)
+    return (bump(d / 1.5) - 0.22 * bump((d + 1.6) / 1.4)) * eio(T / 4);
   }
 
   /** the song: how loud it is right now (0–1). Set from outside; without a song, a slow breath */
@@ -891,6 +899,7 @@ export class Bloom {
   private frameMs = 16; private lastFrame = performance.now(); private slowFor = 0;
   private pl = 0;
   private lastT = 0;
+  private fdt = 1 / 60;
 
   // fireflies: warm little lights wandering among the flowers, blinking slowly, near ones big and blurry
   private flies: { x: number; y: number; z: number; ph: number; sp: number; blink: number; per: number }[] = [];
