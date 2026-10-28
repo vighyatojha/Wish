@@ -529,7 +529,7 @@ export class Bloom {
     const [bx, by] = this.base();
     // the view starts close on her flower and draws back as the meadow comes up; then, once it's all
     // open, it slowly moves in again on the bunch over half a minute, like a film's last shot
-    let zoom = 1 + (W / H < 1 ? 0.07 : 0.15) * (1 - eio((t - this.spreadAt + 0.5) / 4.5));
+    let zoom = 1 + (W / H < 1 ? 0.16 : 0.3) * (1 - eio((t - this.spreadAt + 1) / 5.6));
     if (this.settledAt) zoom += 0.07 * eio((t - this.settledAt) / 32);
     const fy = by - this.U * 0.55 * clamp(this.settledAt ? (t - this.settledAt) / 32 : 0);
     lg.translate(bx, fy); lg.scale(zoom, zoom); lg.translate(-bx, -fy);

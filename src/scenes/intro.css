@@ -194,6 +194,7 @@
   .kid__note { --rule: 21px; align-self: stretch; width: auto; padding-left: 2.2rem; }
 
   .kid__photo { right: 5%; left: auto; top: 13%; bottom: auto; width: 26vw; }
+  .kid__qnote { max-width: calc(100% - 26vw); } /* (its line stays clear of the photo beside it) */
 
 }
 /* a phone held sideways: smaller everything */

@@ -17,6 +17,7 @@ import { GrainPattern } from './CuteBird';
 import guideUrl from '../assets/guide.webp';
 import { Unfurl } from '../lib/unfurl';
 import { TypeGarden } from '../lib/typegarden';
+import { shrinkToFit, refitOnResize } from '../lib/fit';
 import dayUrl from '../assets/meaning-day.webp';
 import nightUrl from '../assets/meaning-night.webp';
 import './meaning.css';
@@ -154,6 +155,14 @@ export function Meaning({ found, onClose, onReplay }: Props) {
   const guide = useRef<HTMLDivElement>(null);
   const sheet = useRef<HTMLDivElement>(null);
   const busy = useRef(false);
+  // (a long page: its words get a little smaller, a step at a time, until the whole page fits)
+  const fitPage = () => {
+    const sh = sheet.current;
+    if (!sh) return;
+    shrinkToFit([...sh.querySelectorAll<HTMLElement>('.book__balloon, .book__caption, .book__colours li')], () => sh.scrollHeight <= sh.clientHeight + 1, 0.6);
+  };
+  useLayoutEffect(fitPage, [page]);
+  useLayoutEffect(() => refitOnResize(fitPage), []);
 
 
   // he only appears for the last pages: from "today, I'm the bus that came to wish you" to the end

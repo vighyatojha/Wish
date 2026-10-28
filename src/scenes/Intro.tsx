@@ -19,6 +19,7 @@ import { enterImmersive, keepAwake, buzz, settleViewport, prefersReducedMotion }
 import { Paper } from '../lib/paper';
 import { Rain, WetMap } from '../lib/rain';
 import { paintInk } from '../lib/ink';
+import { refitOnResize } from '../lib/fit';
 import { saveResponse } from '../lib/firebase';
 import './intro.css';
 
@@ -48,6 +49,9 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
   const paperCanvas = useRef<HTMLCanvasElement>(null);
   const rainCanvas = useRef<HTMLCanvasElement>(null);
   const [typing, setTyping] = useState(false);
+  // (when the box loses focus, the page waits a moment before rearranging itself: otherwise a tap on
+  //  "Submit" closes the keyboard, the button jumps up, and the tap lands where it used to be)
+  const blurTimer = useRef(0);
   const [phase, setPhase] = useState<Phase>('tap');
   const [feedback, setFeedback] = useState('');
   const [wet, setWet] = useState(false);
@@ -56,6 +60,21 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
   const stopEffects = useRef<(() => void) | null>(null);
 
   const { contextSafe } = useGSAP({ scope: root });
+
+  // ── his note always fits its paper, however long it is: its lines (and the ruled lines under them)
+  //    move closer together, a step at a time, until the whole note shows ──
+  const fitNote = () => {
+    const n = pageRef.current?.querySelector<HTMLElement>('.kid__note');
+    if (!n || !n.offsetHeight) return;
+    n.style.removeProperty('--rule'); n.style.removeProperty('--rule-top');
+    let rule = parseFloat(getComputedStyle(n.querySelector('.kid__note-title') ?? n).lineHeight) || 24;
+    // (set in pixels, so the rain's copy of the page draws the ruled lines in the same places)
+    const set = () => { n.style.setProperty('--rule', `${rule.toFixed(2)}px`); n.style.setProperty('--rule-top', `${(rule * 1.8).toFixed(2)}px`); };
+    set();
+    for (let i = 0; i < 40 && n.scrollHeight > n.clientHeight + 1 && rule > 12; i++) { rule *= 0.95; set(); }
+  };
+  useEffect(() => refitOnResize(fitNote), []);
+  useEffect(() => { fitNote(); }, [typing, phase]);
 
   // ── 1. First tap ───────────────────────────────────────────
   const begin = () => {
@@ -163,6 +182,7 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
     const st = { rain: 0, soak: 0, dissolve: 0, tint: 0, dim: 0 };
     if (paper) {
       paper.resize(W, H, dpr);
+      fitNote();
       paper.setInk(paintInk(pageRef.current!, W, H, dpr));
       paper.setWet(wetMap.canvas);
       paper.render({ time: 0, ...st });
@@ -274,8 +294,8 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
               autoCorrect="off"
               spellCheck={false}
               maxLength={80}
-              onFocus={() => setTyping(true)}
-              onBlur={() => setTyping(false)}
+              onFocus={() => { clearTimeout(blurTimer.current); setTyping(true); }}
+              onBlur={() => { clearTimeout(blurTimer.current); blurTimer.current = window.setTimeout(() => setTyping(false), 400); }}
             />
             <InkText as="button" className="intro__submit" type="submit" text={copy.button} />
             <InkText className="intro__feedback" role="status" aria-live="polite" text={feedback} />

@@ -29,7 +29,7 @@
 //  jumps straight to a step (sound needs a tap first, so it's silent),
 //  and ?speed=4 runs the clock four times as fast.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { content } from '../content';
 import { gsap, useGSAP, ease } from '../lib/motion';
 import { buzz, prefersReducedMotion, isTouch } from '../lib/device';
@@ -42,6 +42,7 @@ import { norm, type V3 } from '../lib/wings';
 import { Bloom, loadFlower, preloadFlowers, type FlowerKind } from '../lib/bloom';
 import { TypeGarden } from '../lib/typegarden';
 import { saveResponse } from '../lib/firebase';
+import { shrinkToFit, refitOnResize } from '../lib/fit';
 import { Fog } from '../lib/fog';
 import { Rain } from '../lib/rain';
 import { Stage, DOOR, MOON, MOON_R, LAMP } from '../lib/stage';
@@ -850,7 +851,8 @@ export function BusStop({ flying, entered }: Props) {
   /** The bus film must be ready to play before the bus can come; on a slow connection, wait for it (with the loading card). */
   async function filmReady() {
     const v = film.current!;
-    const playable = () => v.readyState >= 3;
+    // (ready to play, or this browser can't play it at all: then the bus arrives without the film)
+    const playable = () => v.readyState >= 3 || !!v.error;
     if (playable()) return;
     const card = window.setTimeout(() => setLoading('bus'), 400);
     await loadedFilm().then(live);
@@ -975,11 +977,19 @@ export function BusStop({ flying, entered }: Props) {
     v.volume = 1;
     try { await v.play(); } catch { v.muted = true; await v.play().catch(() => {}); }
     live(0);
-    await new Promise<void>((r) => {
+    await Promise.race([new Promise<void>((r) => {
       const anyV = v as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => void };
       if (anyV.requestVideoFrameCallback) anyV.requestVideoFrameCallback(() => r());
       else setTimeout(r, 150);
-    }).then(live);
+    }), wait(1.5)]).then(live); // (a film this browser can't play never shows a frame: don't wait for one)
+    if (v.error || v.readyState < 2) {
+      // the film can't be played here: the bus simply fades in at the stop
+      v.pause();
+      playAirRelease(1.4, 0.38);
+      await play(gsap.to(S.weights, { 0: 0, 1: 0, 2: 1, duration: 1.4, ease: 'sine.inOut' }));
+      await wait(0.6);
+      return;
+    }
     // if this browser can't show the film, the bus simply fades in at the stop
     await wait(0.4);
     if (!stageRef.current) {
@@ -1196,7 +1206,8 @@ export function BusStop({ flying, entered }: Props) {
     const r = Math.max(46, MOON_R * ppp * 2.1);
     lifeRef.current!.heart(mx * W, my * H + r * 0.12, r, 14);
     // the message appears just below the moon
-    finaleEl.current?.style.setProperty('--top', `${Math.min(H * 0.42, my * H + r * 1.25)}px`);
+    const top = Math.min(H * 0.42, my * H + r * 1.25);
+    if (finaleEl.current) { finaleEl.current.dataset.top = String(top); finaleEl.current.style.setProperty('--top', `${top}px`); }
     setUi((u) => ({ ...u, finale: true }));
     // once the message has fully appeared: ten seconds, then her flower
     await wait(Math.max(7, tune * 0.5));
@@ -1279,6 +1290,33 @@ export function BusStop({ flying, entered }: Props) {
   }), []);
 
   const words = (line: string) => line.split(' ').map((w, k) => <span key={k} className="stop__word">{w} </span>);
+
+  // ── whatever their length, the hidden-message cards and the finale message always fit on the screen ──
+  const fitCard = () => {
+    const c = document.querySelector<HTMLElement>('.stop__birdcard'), veil = c?.parentElement;
+    if (!c || !veil) return;
+    veil.style.paddingTop = '';
+    const H = window.innerHeight, room = () => c.getBoundingClientRect().bottom <= H - 12;
+    shrinkToFit([...c.querySelectorAll<HTMLElement>('strong, span, em')], room, 0.6);
+    // (still too long: it moves up the screen as far as it has to)
+    if (!room()) veil.style.paddingTop = `${Math.max(8, H - 12 - c.offsetHeight)}px`;
+  };
+  const fitFinale = () => {
+    const f = finaleEl.current;
+    if (!f || f.hidden) return;
+    const H = window.innerHeight, top = parseFloat(f.dataset.top ?? '') || H * 0.22;
+    f.style.setProperty('--top', `${top}px`);
+    const room = () => f.getBoundingClientRect().bottom <= H - 14;
+    const msg = f.querySelector<HTMLElement>('.stop__finale-msg');
+    if (msg && shrinkToFit([msg], room, 0.62) < 0.63 && !room()) {
+      // (still too long even small: it moves up, closer to the moon, as far as it has to)
+      const over = f.getBoundingClientRect().bottom - (H - 14);
+      f.style.setProperty('--top', `${Math.max(H * 0.04, top - over)}px`);
+    }
+  };
+  useLayoutEffect(fitCard, [ui.secret]);
+  useLayoutEffect(fitFinale, [ui.finale, count > 0]); // (and again when the countdown appears under it)
+  useEffect(() => refitOnResize(() => { fitCard(); fitFinale(); }), []);
 
   return (
     <section className="scene stop" aria-label="The bus stop">
