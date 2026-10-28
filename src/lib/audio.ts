@@ -536,9 +536,41 @@ export function prepareSong(url: string): Promise<AudioBuffer | null> {
 /** Plays a decoded song softly in the background, fading in, and looping for as long as it's wanted:
  *  each time round, the next play starts a few seconds before the last one ends and the two cross-fade,
  *  so there's never a jump or a gap. Returns a handle to fade it out. */
+// ── how loud the song is right now (0 → 1), for things that move with it: worked out once from the
+//    song itself (its low notes, where the beat is), so it follows the music exactly, even when muted ──
+const ENV_RATE = 30;
+let envOf: { buf: AudioBuffer; env: Float32Array } | null = null;
+let songStart = -1, songLen = 0;
+function envelope(buf: AudioBuffer): Float32Array {
+  const d = buf.getChannelData(0), sr = buf.sampleRate, hop = Math.round(sr / ENV_RATE);
+  const n = Math.floor(d.length / hop), env = new Float32Array(n);
+  let lp = 0; const a = 1 - Math.exp(-2 * Math.PI * 180 / sr); // (a gentle low-pass: the bass and the beat)
+  for (let i = 0; i < n; i++) {
+    let sum = 0;
+    for (let j = i * hop, e = j + hop; j < e; j++) { lp += (d[j] - lp) * a; sum += lp * lp; }
+    env[i] = Math.sqrt(sum / hop);
+  }
+  // normalise against a slow average, so it's the swells and beats that show, not the overall loudness
+  let avg = 0, peak = 1e-6;
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) { avg += (env[i] - avg) * 0.02; out[i] = Math.max(0, env[i] - avg * 0.85); peak = Math.max(peak, out[i]); }
+  for (let i = 0; i < n; i++) out[i] = Math.min(1, out[i] / (peak * 0.6));
+  return out;
+}
+export function songPulse(): number | null {
+  if (!ctx || songStart < 0 || !envOf) return null;
+  const t = ctx.currentTime - songStart;
+  if (t < 0) return 0;
+  const i = Math.floor(((t % songLen) * ENV_RATE)) % envOf.env.length;
+  return envOf.env[i];
+}
+
 export function playSong(buf: AudioBuffer, level = 0.35, fadeIn = 2.5, xfade = 3): LiveSound {
   if (!ctx || !master) return silent;
   const ac = ctx;
+  if (envOf?.buf !== buf) envOf = { buf, env: envelope(buf) };
+  songStart = ac.currentTime + 0.05; songLen = buf.duration - Math.min(xfade, buf.duration / 4);
+  (window as unknown as { __songAt?: number }).__songAt = performance.now(); // (for the recordings that check the song's timing)
   if (ac.state === 'suspended') void ac.resume();
   const out = new GainNode(ac, { gain: level });
   out.connect(master);

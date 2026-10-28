@@ -35,7 +35,7 @@ import { gsap, useGSAP, ease } from '../lib/motion';
 import { buzz, prefersReducedMotion, isTouch } from '../lib/device';
 import {
   createRainSound, createWindSound, createCrickets, playWhoosh, playSnap, playAirRelease, playDoor, playStep,
-  playShimmer, playChime, playPop, playMusicBox, isMuted, setMuted, onMute, prepareSong, playSong, unlockAudio, type LiveSound,
+  playShimmer, playChime, playPop, playMusicBox, isMuted, setMuted, onMute, prepareSong, playSong, songPulse, unlockAudio, type LiveSound,
 } from '../lib/audio';
 import { dayLook, formatHour, DAY_START, DAY_END, SECONDS_PER_HOUR, type DayLook } from '../lib/clock';
 import { norm, type V3 } from '../lib/wings';
@@ -1227,6 +1227,7 @@ export function BusStop({ flying, entered }: Props) {
     if (finaleEl.current) gsap.to(finaleEl.current, { autoAlpha: 0, y: -24, duration: 1.2, ease: ease.exit });
     gsap.to(svg.current, { opacity: 0, duration: 1.4, ease: 'sine.inOut' });
     gsap.to('.stop__clock', { autoAlpha: 0, duration: 1.2 });
+    window.setTimeout(() => gsap.set('.stop__clock', { autoAlpha: 0 }), 1500); // (in case it wasn't on screen yet)
     await play(gsap.to(bouquetVeil.current, { opacity: 1, duration: 2, ease: 'sine.inOut' }));
     setUi((u) => ({ ...u, finale: false }));
     S.blackout = true; // (the scene underneath stops drawing: it can't be seen)
@@ -1236,6 +1237,7 @@ export function BusStop({ flying, entered }: Props) {
     live(0);
     const bq = new Bloom(canvas, kind);
     bq.waitingText = content.finale.flowersComing;
+    bq.pulse = songPulse;
     bq.resize(W, H);
     const onResize = () => bq.resize(window.innerWidth, window.innerHeight);
     window.addEventListener('resize', onResize);
@@ -1267,7 +1269,7 @@ export function BusStop({ flying, entered }: Props) {
     await bq.settled.then(live);
     await wait(Math.max(1, (songEnds + 5000 - performance.now()) / 1000));
     await guideReady().then(live);  // (his picture is long since here; this just makes sure)
-    setUi((u) => ({ ...u, ask: true }));
+    if (!new URLSearchParams(location.search).has('noask')) setUi((u) => ({ ...u, ask: true }));
   }
 
   const flowers = useMemo(() => ({
