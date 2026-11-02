@@ -10,13 +10,15 @@ let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 const LEVEL = 0.9;
 
-// ── Mute: one switch for everything (remembered for next time) ──
-let muted = (() => { try { return localStorage.getItem('muted') === '1'; } catch { return false; } })();
+// ── Mute: one switch for everything. Remembered only for this visit: every new visit starts with sound on,
+//    so a tap on it once doesn't silence the whole thing next time ──
+try { localStorage.removeItem('muted'); } catch { /* private mode */ }  // (the old, remembered-forever switch)
+let muted = (() => { try { return sessionStorage.getItem('muted') === '1'; } catch { return false; } })();
 const muteListeners = new Set<(m: boolean) => void>();
 export const isMuted = () => muted;
 export function setMuted(m: boolean): void {
   muted = m;
-  try { localStorage.setItem('muted', m ? '1' : '0'); } catch { /* private mode */ }
+  try { sessionStorage.setItem('muted', m ? '1' : '0'); } catch { /* private mode */ }
   if (ctx && master) master.gain.setTargetAtTime(m ? 0 : LEVEL, ctx.currentTime, 0.08);
   muteListeners.forEach((cb) => cb(m));
 }
