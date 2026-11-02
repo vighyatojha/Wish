@@ -1,7 +1,7 @@
 // His picture, popping up at the very end with a little note.
 //  • asking: "would you like to know what everything here means?" with two buttons
 //  • otherwise: "whenever you visit again, just tap on me…" (tapping him opens his storybook)
-import guideUrl from '../assets/guide.webp';
+import guideUrl from '../assets/penguin.webp'; // (a penguin asks, over her flowers; his own photo is in the book)
 import { content } from '../content';
 import './story-button.css';
 

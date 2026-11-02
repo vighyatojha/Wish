@@ -289,6 +289,12 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
             <h1 className="intro__name" data-ink="">
               {[...content.name].map((ch, i) => <span key={i} className="w" style={{ color: rainbow[i % rainbow.length] }}>{ch}</span>)}
             </h1>
+            {/* the two of them, stuck on crooked (on a laptop it's stuck on lower down, by the cake; on a phone,
+                beside her name, where it can't cover anything) */}
+            <figure className="kid__photo">
+              <img src={usPhotoUrl} alt="" data-ink-img="" draggable={false} />
+              <InkText as="figcaption" className="kid__photo-cap" text={copy.photoCaption} />
+            </figure>
           </header>
 
           <form className="intro__form" autoComplete="off" noValidate onSubmit={onSubmit}>
@@ -331,12 +337,6 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
           <InkText as="h2" className="kid__note-title" text={copy.noteTitle} />
           {copy.note.map((para, i) => <InkText key={i} className="kid__note-p" text={para} />)}
         </aside>
-
-        {/* the two of them, stuck on crooked */}
-        <figure className="kid__photo">
-          <img src={usPhotoUrl} alt="" data-ink-img="" draggable={false} />
-          <InkText as="figcaption" className="kid__photo-cap" text={copy.photoCaption} />
-        </figure>
 
         {/* a cake, bouncing about the page */}
         <InkText as="span" className="kid__cake" aria-hidden="true" text="🎂" />
