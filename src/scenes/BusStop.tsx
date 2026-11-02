@@ -363,7 +363,7 @@ export function BusStop({ flying, entered }: Props) {
 
     // if the device is struggling, draw at a lower resolution until it keeps up
     // (phones start a step lower: their screens are dense, and the painting is soft anyway)
-    const QUALITY = isTouch ? [1.25, 1.0, 0.8, 0.6] : [1.5, 1.1, 0.8, 0.6];
+    const QUALITY = isTouch ? [1.5, 1.2, 1.0, 0.8, 0.6] : [1.5, 1.1, 0.8, 0.6];
     let quality = 0, slowFrames = 0, slowTime = 0;
     const setQuality = (q: number) => {
       quality = q;
@@ -1322,7 +1322,7 @@ export function BusStop({ flying, entered }: Props) {
     await document.fonts.load('700 100px "Playfair Display"').catch(() => {});
     // (the roses take the colour of her flowers; green stems, white letters)
     const rose = { Tulip: '#ff2e4d', Lily: '#ff5a3c', Lotus: '#ff6f9f' }[kind];
-    const tg = new TypeGarden(gc, { palette: ['night', 'transparent', rose, '#3f9a52', '#fff4ea', '#f7f4ff', '#06210f'], flowers: [rose, '#ff8fb1', '#f6c12e', '#f39a6b', '#b48cf0'], transparent: true, interactive: false, caret: true, scale: 0.3, density: 0.7, legible: true, maxDpr: isTouch ? 1.5 : 2, font: '"Playfair Display",Georgia,serif' });
+    const tg = new TypeGarden(gc, { palette: ['night', 'transparent', rose, '#3f9a52', '#fff4ea', '#f7f4ff', '#06210f'], flowers: [rose, '#ff8fb1', '#f6c12e', '#f39a6b', '#b48cf0'], transparent: true, interactive: false, caret: true, scale: 0.3, density: 0.7, legible: true, maxDpr: 2, font: '"Playfair Display",Georgia,serif' });
     gardenRef.current = tg;
     tg.start();
     for (const ch of content.finale.gardenWords) { tg.type(ch); await wait(ch === ' ' ? 0.32 : 0.2); }
