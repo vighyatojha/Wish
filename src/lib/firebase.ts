@@ -44,7 +44,10 @@ export interface Response {
 function nameFor(d: Response): string {
   const t = new Date(), p = (n: number) => String(n).padStart(2, '0');
   const stamp = `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())}`;
-  const what = d.scene === 'intro' ? `Page 1 · 19+9 · try ${d.attempt}` : d.scene === 'bus-stop' ? 'Favourite flower' : d.scene;
+  const where = ['after the banner', 'between the scrolls', 'in the book'];
+  const q = /^question-(\d)$/.exec(d.scene);
+  const what = d.scene === 'intro' ? `Page 1 · 19+9 · try ${d.attempt}` : d.scene === 'bus-stop' ? 'Favourite flower'
+    : q ? `Question ${q[1]} · ${where[+q[1] - 1] ?? ''}` : d.scene;
   return `${stamp} · ${what}`.replace(/\//g, '-');
 }
 

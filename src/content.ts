@@ -207,6 +207,22 @@ export const content = {
     thanks: 'I tried my best to make you feel at least one of these. Thank you for being here, and I hope you have a lovely day! 💛',
   },
 
+  // Three little questions she answers by typing (each answer is saved for you in Firebase).
+  //   1: after the birthday banner flies away · 2: after the third scroll · 3: the last page of the book.
+  // PLACEHOLDERS: write your own. Short or long, the card fits itself to the question.
+  questions: {
+    label: 'A little question for you 💭',
+    asks: [
+      'How has your birthday been so far? 😊',
+      'What’s one thing that made you smile this year?',
+      'Anything you’d like to say back? 💌',
+    ],
+    placeholder: 'Write here…',
+    send: 'Send ✨',
+    skip: 'Skip',
+    thanks: 'Got it, thank you! 💛',
+  },
+
   // The small round button in the corner
   sound: { mute: 'Turn sound off', unmute: 'Turn sound on' },
 } as const;

@@ -43,6 +43,7 @@ import { Bloom, loadFlower, preloadFlowers, type FlowerKind } from '../lib/bloom
 import { TypeGarden } from '../lib/typegarden';
 import { saveResponse } from '../lib/firebase';
 import { shrinkToFit, refitOnResize } from '../lib/fit';
+import { QuestionCard } from '../components/QuestionCard';
 import { Fog } from '../lib/fog';
 import { Rain } from '../lib/rain';
 import { Stage, DOOR, MOON, MOON_R, LAMP } from '../lib/stage';
@@ -216,7 +217,7 @@ export function BusStop({ flying, entered }: Props) {
   const debug = useRef<HTMLPreElement>(null);
   const mapRef = useRef<{ map: (uv: Vec2) => Vec2; ppp: number; W: number; H: number }>({ map: (u) => u, ppp: 1, W: 1, H: 1 });
   const alive = useRef(true);
-  const waiters = useRef<{ pluck?: () => void; note?: () => void; answer?: (a: string) => void; go?: () => void }>({});
+  const waiters = useRef<{ pluck?: () => void; note?: () => void; answer?: (a: string) => void; go?: () => void; query?: (a: string | null) => void }>({});
   const bannerRef = useRef<Banner | null>(null);
 
   const [arrived, setArrived] = useState(false);
@@ -228,7 +229,7 @@ export function BusStop({ flying, entered }: Props) {
   const [loaded, setLoaded] = useState({ pictures: 0, film: 0 });
   const pics = useRef<Pictures | null>(null);
   const [noteIndex, setNoteIndex] = useState(0);
-  const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', secret: null as null | { kind: SecretKind; line: number }, go: false, finale: false, replay: false, clock: false, ask: false, final: false, meaning: false, horse: null as null | { files: Horse; shown: boolean; leaving: boolean; slow: boolean } });
+  const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', secret: null as null | { kind: SecretKind; line: number }, go: false, finale: false, replay: false, clock: false, ask: false, final: false, meaning: false, horse: null as null | { files: Horse; shown: boolean; leaving: boolean; slow: boolean }, query: null as null | number });
   const [muted, setMutedState] = useState(isMuted());
   const clockText = useRef<HTMLSpanElement>(null);
   const clockIcon = useRef<SVGGElement>(null);
@@ -635,11 +636,11 @@ export function BusStop({ flying, entered }: Props) {
     // hidden messages: tapping the moon, the stars, a firefly, the lamp or a bird (there is no hint that she can)
     const onSky = (e: PointerEvent) => {
       const el = e.target as Element | null;
-      if (el?.closest?.('.stop__hud, .stop__veil, .stop__question, button')) return;
+      if (el?.closest?.('.stop__hud, .stop__veil, .stop__question, .qcard, button')) return;
       // (not while a note is open or the whole screen is a "tap to continue", nor once her flowers have the
       //  screen; while the question is up, or the flower waits to be plucked, the rest of the sky is hers)
       const w8 = waiters.current;
-      if (w8.note || w8.go || S.blackout) return;
+      if (w8.note || w8.go || w8.query || S.blackout) return;
       const { map, ppp, W: w, H: h } = mapRef.current;
       const x = e.clientX, y = e.clientY;
       const night = S.night > 3.2;
@@ -808,6 +809,9 @@ export function BusStop({ flying, entered }: Props) {
       gsap.to(S, { garden: 1, birds: 1, duration: 2, ease: ease.enter });
       await wait(1.2);
       await bunting();
+      // ── a little question for her (the first of three) ──
+      await wait(0.8);
+      await askQuestion(0);
     }
 
     if (skip !== 'animals' && skip !== 'question') {
@@ -828,6 +832,7 @@ export function BusStop({ flying, entered }: Props) {
         await until(ANIMAL_HOURS[i], i === 0 ? 0.9 : 0.5);
         ({ gone } = await visit(i));
         gone.catch(() => {});
+        if (i === 2) { await wait(1.2); await askQuestion(1); } // (the second, after the third scroll)
       }
       await until(QUESTION_HOUR, 0.5);
       await gone;
@@ -836,6 +841,20 @@ export function BusStop({ flying, entered }: Props) {
     await wait(1);
     await question();
     await finale();
+  }
+
+  // ── a little question she answers by typing: the day waits for her while it's open ──
+  async function askQuestion(i: number) {
+    const text = content.questions.asks[i];
+    if (!text) return;
+    const running = S.clock;
+    S.clock = false;
+    setUi((u) => ({ ...u, query: i, secret: null }));
+    const answer = await new Promise<string | null>((r) => { waiters.current.query = (a) => { waiters.current.query = undefined; r(a); }; }).then(live);
+    if (answer) void saveResponse({ scene: `question-${i + 1}`, question: text, answer, correct: true, attempt: 1 });
+    setUi((u) => ({ ...u, query: null }));
+    await wait(0.6);
+    S.clock = running;
   }
 
   function startBirdsong() {
@@ -1508,6 +1527,11 @@ export function BusStop({ flying, entered }: Props) {
           </p>
         )}
       </div>
+
+      {/* a little question she answers by typing */}
+      {ui.query !== null && (
+        <QuestionCard key={ui.query} text={content.questions.asks[ui.query]} onDone={(a) => waiters.current.query?.(a)} />
+      )}
 
       {/* the running horse, between the countdown and her flowers */}
       {ui.horse && (
