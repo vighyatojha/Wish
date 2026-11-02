@@ -373,12 +373,34 @@ export function BusStop({ flying, entered }: Props) {
       life.resize(W, H);
     };
     let fastTime = 0, settleUntil = 0, best = 0;
+    // (the sharpness a level really draws at on this screen: on a 1× screen, 1.5 and 1.1 are the same)
+    const eff = (q: number) => Math.min(window.devicePixelRatio || 1, QUALITY[q]);
+    const coarser = (q: number) => { for (let k = q + 1; k < QUALITY.length; k++) if (eff(k) < eff(q) - 0.01) return k; return -1; };
+    // each step down is a trial: if the frames don't actually come faster, the slowness wasn't the drawing
+    // (e.g. a laptop on battery, where the browser holds every page to 30 frames a second): then it goes
+    // straight back to full sharpness and stays there, instead of getting blurrier for nothing
+    let trial: { from: number; before: number; sum: number; n: number } | null = null;
+    let capped = false;
     const adapt = (rawDt: number, now: number) => {
       // (not while things are still arriving and being set up: those moments are slow once, not always)
-      if (!stageShown || now < settleUntil || keepQuality) return;
+      if (!stageShown || keepQuality || capped) return;
+      if (trial && now >= settleUntil) {
+        trial.sum += rawDt; trial.n++;
+        if (trial.n >= 90) {
+          const after = trial.sum / trial.n;
+          if (after > trial.before * 0.88) { capped = true; best = trial.from; setQuality(trial.from); }
+          trial = null;
+        }
+        return;
+      }
+      if (now < settleUntil) return;
       // slower than ~40 frames a second for a while: draw a little coarser, until it keeps up…
       if (rawDt > 1 / 40) { slowFrames++; slowTime += rawDt; fastTime = 0; } else { slowFrames = Math.max(0, slowFrames - 1); fastTime += rawDt; }
-      if (slowFrames > 40 && slowTime > 1.2 && quality < QUALITY.length - 1) { best = quality + 1; setQuality(quality + 1); settleUntil = now + 2000; }
+      const next = coarser(quality);
+      if (slowFrames > 40 && slowTime > 1.2 && next >= 0) {
+        trial = { from: quality, before: slowTime / slowFrames, sum: 0, n: 0 };
+        best = next; setQuality(next); settleUntil = now + 2000;
+      }
       // …and back up again once it has been comfortably smooth for a while (never back to a level that was too slow)
       else if (fastTime > 6 && quality > best) { setQuality(quality - 1); settleUntil = now + 3000; }
     };
