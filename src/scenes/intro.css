@@ -221,13 +221,16 @@
   left: 0;
   top: 0;
   font-size: clamp(2.6rem, 5vw, 4rem);
+  will-change: transform;
   line-height: 1;
   pointer-events: none;
   z-index: 3;
-  animation: kid-cake-x 9s steps(36) infinite alternate, kid-cake-y 6.4s steps(26) infinite alternate, kid-cake-spin 2.4s steps(8) infinite;
+  animation: kid-cake-drift 9s ease-in-out infinite alternate, kid-cake-spin 2.4s steps(8) infinite;
 }
-@keyframes kid-cake-x { from { left: 2%; } to { left: calc(96% - 4rem); } }
-@keyframes kid-cake-y { from { top: 12%; } to { top: calc(94% - 4rem); } }
+@keyframes kid-cake-drift {
+  from { transform: translate3d(2vw, 12vh, 0); }
+  to { transform: translate3d(calc(96vw - 4rem), calc(94vh - 4rem), 0); }
+}
 @keyframes kid-cake-spin { 0% { rotate: -18deg; } 25% { rotate: 14deg; } 50% { rotate: -8deg; } 75% { rotate: 24deg; } 100% { rotate: -18deg; } }
 .kid__deco { position: absolute; font-size: clamp(1.4rem, 2.4vw, 2rem); line-height: 1; pointer-events: none; animation: kid-wiggle 1.6s steps(4) infinite alternate; }
 .kid__deco--1 { left: 3%; bottom: 6%; }
