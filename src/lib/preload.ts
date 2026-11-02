@@ -21,6 +21,10 @@ import filmUrl from '../assets/bus-arrives.mp4';
 import birdsongUrl from '../assets/birdsong.m4a';
 import flowerSongUrl from '../assets/flower-song.mp3';
 import varshaPhotoUrl from '../assets/varsha-photo.webp';
+import horseWebmUrl from '../assets/horse-run.webm';
+import horseMp4Url from '../assets/horse-run.mp4';
+import horsePosterUrl from '../assets/horse-run.jpg';
+import horseTuneUrl from '../assets/horse-tune.mp3';
 
 export const PICTURES = { morning: morningUrl, empty: emptyUrl, bus: busUrl, masks: masksUrl, masks2: masks2Url, lamp: lampUrl, moon: moonUrl };
 export type PictureKey = keyof typeof PICTURES;
@@ -118,7 +122,13 @@ function decoded(src: string): Promise<string> {
   });
 }
 
-let started: { pictures: Promise<Pictures>; photo: Promise<string>; film: Promise<string>; birdsong: Promise<string>; flowerSong: Promise<string> } | null = null;
+/** the little running horse (between the last countdown and her flowers): its film, its first frame, its tune */
+export interface Horse { video: string; poster: string; tune: string }
+/** the horse's film in a format this browser plays (WebM where it can, MP4 otherwise, e.g. older iPhones) */
+export const horseVideoUrl = (): string => (document.createElement('video').canPlayType('video/webm; codecs="vp9"') ? horseWebmUrl : horseMp4Url);
+export const HORSE_FILES: Horse = { get video() { return horseVideoUrl(); }, poster: horsePosterUrl, tune: horseTuneUrl };
+
+let started: { pictures: Promise<Pictures>; photo: Promise<string>; film: Promise<string>; birdsong: Promise<string>; horse: Promise<Horse>; flowerSong: Promise<string> } | null = null;
 
 export function preloadStory() {
   if (started) return started;
@@ -131,9 +141,16 @@ export function preloadStory() {
   const photo = pictures.then(() => download(varshaPhotoUrl));
   const film = photo.then(() => download(filmUrl));
   const birdsong = film.then(() => download(birdsongUrl));
+  // the running horse (about 360 KB in all), needed just before her flowers
+  const horse = birdsong.then(async () => {
+    const poster = await download(horsePosterUrl);
+    const video = await download(horseVideoUrl());
+    const tune = await download(horseTuneUrl);
+    return { video, poster, tune };
+  });
   // the song for her flowers comes last of all: it's only needed at the very end, minutes later
-  const flowerSong = birdsong.then(() => download(flowerSongUrl));
-  started = { pictures, photo, film, birdsong, flowerSong };
+  const flowerSong = horse.then(() => download(flowerSongUrl));
+  started = { pictures, photo, film, birdsong, horse, flowerSong };
   return started;
 }
 
@@ -142,3 +159,4 @@ export const loadedPhoto = () => preloadStory().photo;
 export const loadedFilm = () => preloadStory().film;
 export const loadedBirdsong = () => preloadStory().birdsong;
 export const loadedFlowerSong = () => preloadStory().flowerSong;
+export const loadedHorse = () => preloadStory().horse;

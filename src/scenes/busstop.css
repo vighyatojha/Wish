@@ -396,6 +396,51 @@
 }
 .stop__count-label { font: italic 400 1.05rem / 1 'EB Garamond', Georgia, serif; color: #f4ead6; }
 
+/* ── the running horse: small, in the middle, its edges melting into the night ── */
+.stop__horse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /* (about 7–9% of the screen: a little window onto the horse, not the whole screen) */
+  width: clamp(200px, min(30vw, 52svh), 440px);
+  aspect-ratio: 16 / 9;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: stop-horse-in 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.stop__horse::before { /* a warm glow behind it */
+  content: '';
+  position: absolute;
+  inset: -22%;
+  background: radial-gradient(closest-side, rgba(255, 196, 110, 0.32), rgba(255, 170, 80, 0.12) 55%, transparent);
+  filter: blur(6px);
+}
+.stop__horse video {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 58%, transparent 100%);
+  mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 58%, transparent 100%);
+}
+.stop__horse.is-leaving { animation: stop-horse-out 0.9s ease-in both; }
+.stop__horse-note {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  margin: 0.4rem 0 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font: italic 400 1rem / 1.2 'EB Garamond', Georgia, serif;
+  color: #f4ead6;
+  text-shadow: 0 1px 8px rgba(8, 10, 30, 0.9);
+  animation: stop-msg-in 1.2s ease both;
+}
+@keyframes stop-horse-in { from { opacity: 0; transform: translate(-50%, -46%) scale(0.9); } }
+@keyframes stop-horse-out { to { opacity: 0; transform: translate(-50%, -50%) scale(0.96); } }
+@media (prefers-reduced-motion: reduce) { .stop__horse, .stop__horse.is-leaving { animation-duration: 0.3s; } }
+
 /* ── the bouquet ── */
 .stop__bq-veil {
   opacity: 0;

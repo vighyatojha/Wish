@@ -480,10 +480,18 @@ export function createCrickets(): LiveSound {
 }
 
 // ── A music box playing "Happy Birthday" (a traditional tune), softly, for the end ──
+let musicBoxOut: GainNode | null = null;
+/** the music box fades away (if it's still playing) */
+export function hushMusicBox(fade = 1.5): void {
+  if (!ctx || !musicBoxOut) return;
+  const g = musicBoxOut.gain, now = ctx.currentTime;
+  g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(0, now + fade);
+}
 export function playMusicBox(beat = 0.43): number {
   if (!ctx || !master) return 0;
   const ac = ctx;
   const out = new GainNode(ac, { gain: 0.5 });
+  musicBoxOut = out;
   // a little room: a soft echo
   const delay = new DelayNode(ac, { delayTime: 0.31 });
   const fb = new GainNode(ac, { gain: 0.28 });
@@ -563,6 +571,42 @@ export function songPulse(): number | null {
   if (t < 0) return 0;
   const i = Math.floor(((t % songLen) * ENV_RATE)) % envOf.env.length;
   return envOf.env[i];
+}
+
+/** Plays a decoded tune, then after `gap` seconds of quiet plays it again, and so on, for as long as it's
+ *  wanted (the running horse's tune: it plays through, rests five seconds, and starts over). */
+export function playWithRests(buf: AudioBuffer, level = 0.5, gap = 5, fadeIn = 0.8): LiveSound {
+  if (!ctx || !master) return silent;
+  const ac = ctx;
+  if (ac.state === 'suspended') void ac.resume();
+  const out = new GainNode(ac, { gain: 0 });
+  out.connect(master);
+  out.gain.setValueAtTime(0, ac.currentTime);
+  out.gain.linearRampToValueAtTime(level, ac.currentTime + fadeIn);
+  const live: AudioBufferSourceNode[] = [];
+  let timer = 0, stopped = false;
+  const play = (at: number) => {
+    const src = new AudioBufferSourceNode(ac, { buffer: buf });
+    src.connect(out);
+    src.start(at);
+    live.push(src);
+    src.onended = () => { const i = live.indexOf(src); if (i >= 0) live.splice(i, 1); };
+    const next = at + buf.duration + gap;
+    timer = window.setTimeout(() => { if (!stopped) play(next); }, Math.max(0, (next - ac.currentTime - 1) * 1000));
+  };
+  play(ac.currentTime + 0.05);
+  return {
+    setLevel(v: number) { out.gain.setTargetAtTime(clamp01(v) * level, ac.currentTime, 0.3); },
+    stop(fade = 1.5) {
+      stopped = true;
+      clearTimeout(timer);
+      const now = ac.currentTime;
+      out.gain.cancelScheduledValues(now);
+      out.gain.setValueAtTime(out.gain.value, now);
+      out.gain.linearRampToValueAtTime(0, now + fade);
+      for (const src of live) { try { src.stop(now + fade + 0.05); } catch { /* already stopped */ } }
+    },
+  };
 }
 
 export function playSong(buf: AudioBuffer, level = 0.35, fadeIn = 2.5, xfade = 3): LiveSound {

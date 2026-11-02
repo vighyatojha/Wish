@@ -35,7 +35,7 @@ import { gsap, useGSAP, ease } from '../lib/motion';
 import { buzz, prefersReducedMotion, isTouch } from '../lib/device';
 import {
   createRainSound, createWindSound, createCrickets, playWhoosh, playSnap, playAirRelease, playDoor, playStep,
-  playShimmer, playChime, playPop, playMusicBox, isMuted, setMuted, onMute, prepareSong, playSong, songPulse, unlockAudio, type LiveSound,
+  playShimmer, playChime, playPop, playMusicBox, isMuted, setMuted, onMute, prepareSong, playSong, playWithRests, hushMusicBox, songPulse, unlockAudio, type LiveSound,
 } from '../lib/audio';
 import { dayLook, formatHour, DAY_START, DAY_END, SECONDS_PER_HOUR, type DayLook } from '../lib/clock';
 import { norm, type V3 } from '../lib/wings';
@@ -57,7 +57,7 @@ import { Meaning, preloadMeaning } from '../components/Meaning';
 import { StoryButton, guideReady } from '../components/StoryButton';
 import { Note, type NoteHandle } from '../components/Note';
 import { FairyArt, FairyRig, FAIRIES } from '../components/Fairy';
-import { loadedPictures, loadedPhoto, loadedFilm, loadedBirdsong, loadedFlowerSong, onProgress, progress, type Pictures } from '../lib/preload';
+import { loadedPictures, loadedPhoto, loadedFilm, loadedBirdsong, loadedFlowerSong, loadedHorse, HORSE_FILES, onProgress, progress, type Pictures, type Horse } from '../lib/preload';
 import './busstop.css';
 
 const PIC_W = 1611, PIC_H = 906;
@@ -228,7 +228,7 @@ export function BusStop({ flying, entered }: Props) {
   const [loaded, setLoaded] = useState({ pictures: 0, film: 0 });
   const pics = useRef<Pictures | null>(null);
   const [noteIndex, setNoteIndex] = useState(0);
-  const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', secret: null as null | { kind: SecretKind; line: number }, go: false, finale: false, replay: false, clock: false, ask: false, final: false, meaning: false });
+  const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', secret: null as null | { kind: SecretKind; line: number }, go: false, finale: false, replay: false, clock: false, ask: false, final: false, meaning: false, horse: null as null | { files: Horse; leaving: boolean; slow: boolean } });
   const [muted, setMutedState] = useState(isMuted());
   const clockText = useRef<HTMLSpanElement>(null);
   const clockIcon = useRef<SVGGElement>(null);
@@ -265,7 +265,7 @@ export function BusStop({ flying, entered }: Props) {
   const actors = useRef<Actor[]>(CARDS.map(() => ({
     mode: 'off', x: 0, y: 0, size: 0, jx: 0, jy: 0, lean: 0, squash: 0, head: 0, footL: 0, footR: 0, offer: 0, clip: false, dust: -1,
   }))).current;
-  const sounds = useRef<{ rain?: LiveSound; wind?: LiveSound; crickets?: LiveSound; birdsong?: HTMLAudioElement; song?: LiveSound }>({}).current;
+  const sounds = useRef<{ rain?: LiveSound; wind?: LiveSound; crickets?: LiveSound; birdsong?: HTMLAudioElement; song?: LiveSound; horse?: LiveSound }>({}).current;
   /** her flowers' song, downloaded and decoded ahead of time */
   const songPrep = useRef<Promise<AudioBuffer | null> | null>(null);
   const fades = useRef({ birdsong: 0 }).current;
@@ -679,6 +679,7 @@ export function BusStop({ flying, entered }: Props) {
       sounds.crickets?.stop(0.5);
       sounds.birdsong?.pause();
       sounds.song?.stop(0.3);
+      sounds.horse?.stop(0.3);
       film.current?.pause();
     };
   }, [S, actors, sounds]);
@@ -762,10 +763,10 @@ export function BusStop({ flying, entered }: Props) {
     void loadedBirdsong().then(preloadFlowers, preloadFlowers);
     // (his book's pictures too, once everything else is in: they're needed only at the very end)
     void loadedFlowerSong().then(preloadMeaning, preloadMeaning);
+    // (when building, jumping straight to a step skips the first page and its tap, so sound wakes on the first tap here)
+    if (skip) window.addEventListener('pointerdown', () => unlockAudio(), { once: true });
     if (skip === 'bouquet') {
-      // (for building: ?scene=bouquet&flower=Lily goes straight to the last gift; skipping the first page skips
-      //  its tap, so sound wakes on the first tap here instead)
-      window.addEventListener('pointerdown', () => unlockAudio(), { once: true });
+      // (for building: ?scene=bouquet&flower=Lily goes straight to the last gift)
       const f = new URLSearchParams(location.search).get('flower');
       // (…and ?scene=bouquet&meaning opens the very last screen, what everything here means)
       if (new URLSearchParams(location.search).has('meaning')) { S.blackout = true; preloadMeaning(); setUi((u) => ({ ...u, meaning: true })); return; }
@@ -1211,9 +1212,33 @@ export function BusStop({ flying, entered }: Props) {
     setUi((u) => ({ ...u, finale: true }));
     // once the message has fully appeared: ten seconds, then her flower
     await wait(Math.max(7, tune * 0.5));
-    for (let n = 10; n > 0; n--) { setCount(n); await wait(1); }
+    for (let n = 5; n > 0; n--) { setCount(n); await wait(1); }
     setCount(0);
+    await horseRun(answerRef.current);
     await bouquet(answerRef.current);
+  }
+
+  // ── after the countdown: a little horse runs in the middle of the screen, with its own tune, for five
+  //    seconds, or for as long as her flowers still need to arrive on a slow connection ──
+  async function horseRun(kind: FlowerKind) {
+    const ready = Promise.all([loadFlower(kind), loadedFlowerSong()]);
+    // (its files came long ago; if not, the browser fetches them directly)
+    const files = await Promise.race([loadedHorse(), wait(1.5).then(() => HORSE_FILES)]);
+    if (!alive.current) return;
+    if (finaleEl.current) gsap.to(finaleEl.current, { autoAlpha: 0, y: -16, duration: 1, ease: ease.exit });
+    hushMusicBox(1.5);
+    setUi((u) => ({ ...u, secret: null, horse: { files, leaving: false, slow: false } })); // (a hidden message left open closes for it)
+    // its tune: through once, five seconds' rest, and again, for as long as the horse is running
+    let done = false;
+    void prepareSong(files.tune).then((buf) => { if (buf && alive.current && !done) sounds.horse = playWithRests(buf, 0.55, 5); });
+    const slowHint = window.setTimeout(() => setUi((u) => (u.horse ? { ...u, horse: { ...u.horse, slow: true } } : u)), 9000);
+    await Promise.all([wait(5), Promise.race([ready, wait(90)])]).then(live);
+    clearTimeout(slowHint);
+    done = true;
+    sounds.horse?.stop(1.8); sounds.horse = undefined;
+    setUi((u) => (u.horse ? { ...u, horse: { ...u.horse, leaving: true } } : u));
+    await wait(0.9);
+    setUi((u) => ({ ...u, horse: null }));
   }
 
   // ── her flower: the screen goes black; from a seed and its roots, a bunch of her flowers grows ──
@@ -1473,6 +1498,14 @@ export function BusStop({ flying, entered }: Props) {
           </p>
         )}
       </div>
+
+      {/* the running horse, between the countdown and her flowers */}
+      {ui.horse && (
+        <div className={`stop__horse${ui.horse.leaving ? ' is-leaving' : ''}`} aria-hidden="true">
+          <video src={ui.horse.files.video} poster={ui.horse.files.poster} autoPlay loop muted playsInline preload="auto" />
+          {ui.horse.slow && <p className="stop__horse-note">{content.finale.flowersComing}</p>}
+        </div>
+      )}
 
       {/* her flower, grown into a bouquet; then her name in a garden of letters */}
       <div ref={bouquetVeil} className="layer stop__bq-veil" aria-hidden="true" />
