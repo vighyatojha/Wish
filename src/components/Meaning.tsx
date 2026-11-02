@@ -18,8 +18,6 @@ import guideUrl from '../assets/guide.webp';
 import { Unfurl } from '../lib/unfurl';
 import { TypeGarden } from '../lib/typegarden';
 import { shrinkToFit, refitOnResize } from '../lib/fit';
-import { QuestionCard } from './QuestionCard';
-import { saveResponse } from '../lib/firebase';
 import dayUrl from '../assets/meaning-day.webp';
 import nightUrl from '../assets/meaning-night.webp';
 import './meaning.css';
@@ -151,9 +149,8 @@ export function Meaning({ found, onClose, onReplay }: Props) {
   // pages: 0 = what she missed, 1…n = what it meant, n+1 = thank you
   // pages: what each thing means (one page each; he arrives on the last of them, the bus's colours),
   // then his thanks, then a P.S.: the hidden messages she missed
-  // (pages: what everything means, then thank you, then the P.S., and last of all her third little question)
-  const S = M.steps.length, thanksPage = S, ps = S + 1, ask = content.questions.asks[2], last = ask ? S + 2 : S + 1;
-  const [answered, setAnswered] = useState(false);
+  // (pages: what everything means, then thank you, then the P.S., and last of all a closing page)
+  const S = M.steps.length, thanksPage = S, ps = S + 1, closing = !!(M.closingNote || M.closingGarden), last = closing ? S + 2 : S + 1;
   const [page, setPage] = useState(0);
   const root = useRef<HTMLDivElement>(null);
   const guide = useRef<HTMLDivElement>(null);
@@ -258,7 +255,7 @@ export function Meaning({ found, onClose, onReplay }: Props) {
         <button type="button" className="book__x" aria-label={M.close} onClick={() => leave(onClose)}>×</button>
         <p className="book__cover">{M.cover}</p>
 
-        <div className={`book__spread${shown ? ' book__spread--him' : ''}${page === thanksPage ? ' book__spread--end' : ''}${page === ps ? ' book__spread--ps' : ''}${ask && page === last ? ' book__spread--ask' : ''}`}>
+        <div className={`book__spread${shown ? ' book__spread--him' : ''}${page === thanksPage || (closing && page === last) ? ' book__spread--end' : ''}${page === ps ? ' book__spread--ps' : ''}`}>
           {/* him (only on the last pages): a crumpled paper that unfolds into his portrait, and his name */}
           {shown && (
             <div className="book__narrator">
@@ -294,12 +291,11 @@ export function Meaning({ found, onClose, onReplay }: Props) {
                 <p className="book__balloon book__balloon--thanks">{M.thanks}</p>
               </>
             )}
-            {ask && page === last && answered && <p className="qcard__thanks">{content.questions.thanks}</p>}
-            {ask && page === last && !answered && (
-              <QuestionCard inline text={ask} onDone={(a) => {
-                if (a && !answered) void saveResponse({ scene: 'question-3', question: ask, answer: a, correct: true, attempt: 1 });
-                setAnswered(true);
-              }} />
+            {closing && page === last && (
+              <>
+                {M.closingNote && <p className="book__balloon book__balloon--thanks">{M.closingNote}</p>}
+                {M.closingGarden && <GardenWords text={M.closingGarden} />}
+              </>
             )}
             {page === ps && (
               <>
