@@ -9,6 +9,8 @@ export interface GardenOptions {
   recoil?: number;
   density?: number;
   scale?: number;
+  /** a fixed number of words on each line (e.g. 2), so a phrase stacks in short lines and can be larger */
+  wordsPerLine?: number;
   legible?: boolean;
   maxDpr?: number;
   font?: string;

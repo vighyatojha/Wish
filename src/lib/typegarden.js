@@ -308,6 +308,25 @@ export class TypeGarden {
       return lines;
     };
     let lines = [A.map((_, i) => i)];
+    // (opts.wordsPerLine: a fixed number of words on each line, e.g. 2, so a phrase stacks in short lines
+    //  and can be set larger; the size is whatever lets every line, and all of them together, fit)
+    const per = this.opts.wordsPerLine;
+    if (per > 0 && words.filter((w) => !w.sp).length > 1) {
+      const ls = [[]]; let count = 0;
+      for (const w of words) {
+        if (!w.sp) { if (count === per) { ls.push([]); count = 0; } count++; }
+        ls[ls.length - 1].push(...w.idx);
+      }
+      const LHf = 1.75, widest = Math.max(...ls.map((li) => lineW(li, 1)));
+      const Sf = Math.min(H * 0.86 / (ls.length * LHf), widest > 0 ? maxW / widest : S0, S0);
+      const nf = ls.length;
+      ls.forEach((li, k) => {
+        let x = W / 2 - lineW(li, Sf) / 2;
+        const y = H / 2 + (k - (nf - 1) / 2) * LHf * Sf + 0.33 * Sf;
+        li.forEach((i) => { const l = A[i], w = ws[i] * Sf; l.tx = x + w / 2; l.ty = y; l.tw = w; l.line = k; x += w; });
+      });
+      return { S: Sf, wrapped: nf > 1, n: nf };
+    }
     const unit = lineW(lines[0], 1);
     let S = unit > 0 ? Math.min(S0, maxW / unit) : S0;
     const multi = words.filter((w) => !w.sp).length > 1;

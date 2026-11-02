@@ -114,7 +114,7 @@ function Panel({ crop, tilt = 0, className = '', children }: { crop: Crop; tilt?
 }
 
 /** "Thank you", growing in roses on the page: ink letters, red roses, green stems, on the book's paper */
-function GardenWords({ text }: { text: string }) {
+function GardenWords({ text, perLine = 0 }: { text: string; perLine?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useLayoutEffect(() => {
     let tg: TypeGarden | null = null, gone = false;
@@ -125,7 +125,7 @@ function GardenWords({ text }: { text: string }) {
         palette: ['paper', 'transparent', '#e3344c', '#3f8a4a', '#fff4ea', '#2b2420', '#1d4a26'],
         flowers: ['#e3344c', '#f2789f', '#f2b92e', '#f39a6b', '#a77fd8'],
         transparent: true, interactive: false, caret: false, scale: 0.42, density: 0.75, legible: true,
-        maxDpr: 2, font: '"Playfair Display",Georgia,serif',
+        maxDpr: 2, font: '"Playfair Display",Georgia,serif', wordsPerLine: perLine,
       });
       tg.start();
       let at = 350;
@@ -133,7 +133,7 @@ function GardenWords({ text }: { text: string }) {
     });
     return () => { gone = true; timers.forEach(clearTimeout); tg?.destroy(); };
   }, [text]);
-  return <canvas ref={ref} className="book__garden" aria-label={text} role="img" />;
+  return <canvas ref={ref} className={`book__garden${perLine ? ' book__garden--stacked' : ''}`} aria-label={text} role="img" />;
 }
 
 interface Props {
@@ -294,7 +294,7 @@ export function Meaning({ found, onClose, onReplay }: Props) {
             {closing && page === last && (
               <>
                 {M.closingNote && <p className="book__balloon book__balloon--thanks">{M.closingNote}</p>}
-                {M.closingGarden && <GardenWords text={M.closingGarden} />}
+                {M.closingGarden && <GardenWords text={M.closingGarden} perLine={2} />}
               </>
             )}
             {page === ps && (

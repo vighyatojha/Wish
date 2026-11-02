@@ -279,3 +279,7 @@
 .book__panel.is-loading > * { visibility: hidden; }
 .book__panel.is-loading > .book__caption { visibility: visible; }
 @keyframes book-wait { from { background-position: 100% 0; } to { background-position: 0 0; } }
+
+/* the closing words, stacked two to a line, so they can be larger */
+.book__garden.book__garden--stacked { height: clamp(170px, 36svh, 320px); }
+@media (orientation: landscape) and (max-height: 520px) { .book__garden.book__garden--stacked { height: 46svh; } }
