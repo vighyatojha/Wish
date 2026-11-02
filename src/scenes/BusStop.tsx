@@ -228,7 +228,7 @@ export function BusStop({ flying, entered }: Props) {
   const [loaded, setLoaded] = useState({ pictures: 0, film: 0 });
   const pics = useRef<Pictures | null>(null);
   const [noteIndex, setNoteIndex] = useState(0);
-  const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', secret: null as null | { kind: SecretKind; line: number }, go: false, finale: false, replay: false, clock: false, ask: false, final: false, meaning: false, horse: null as null | { files: Horse; leaving: boolean; slow: boolean } });
+  const [ui, setUi] = useState({ bubble: false, pluck: false, question: false, answer: '', secret: null as null | { kind: SecretKind; line: number }, go: false, finale: false, replay: false, clock: false, ask: false, final: false, meaning: false, horse: null as null | { files: Horse; shown: boolean; leaving: boolean; slow: boolean } });
   const [muted, setMutedState] = useState(isMuted());
   const clockText = useRef<HTMLSpanElement>(null);
   const clockIcon = useRef<SVGGElement>(null);
@@ -268,6 +268,8 @@ export function BusStop({ flying, entered }: Props) {
   const sounds = useRef<{ rain?: LiveSound; wind?: LiveSound; crickets?: LiveSound; birdsong?: HTMLAudioElement; song?: LiveSound; horse?: LiveSound }>({}).current;
   /** her flowers' song, downloaded and decoded ahead of time */
   const songPrep = useRef<Promise<AudioBuffer | null> | null>(null);
+  /** the running horse's tune, decoded ahead so it starts the moment the horse appears */
+  const horseTune = useRef<Promise<AudioBuffer | null> | null>(null);
   const fades = useRef({ birdsong: 0 }).current;
 
   // ── Everything that draws, created once ─────────────────────
@@ -1200,6 +1202,9 @@ export function BusStop({ flying, entered }: Props) {
     gsap.to(S, { glow: 1, vignette: 0.5, duration: 3.5, ease: 'sine.inOut' });
     const tune = playMusicBox();
     songPrep.current ??= loadedFlowerSong().then(prepareSong); // (her flowers' song: decoded while she reads)
+    horseTune.current ??= loadedHorse().then((f) => prepareSong(f.tune)); // (and the horse's tune, so it starts the instant the horse comes)
+    // (and the horse itself, already galloping out of sight, so it's in full stride the moment it appears)
+    void loadedHorse().then((files) => { if (alive.current) setUi((u) => (u.horse ? u : { ...u, horse: { files, shown: false, leaving: false, slow: false } })); });
     await wait(1.2);
     // fireflies gather into a heart around the full moon
     const { map, ppp, W, H } = mapRef.current;
@@ -1226,13 +1231,16 @@ export function BusStop({ flying, entered }: Props) {
     //  and the horse comes the moment they're here, so there's never an empty space. If her flowers are
     //  ready before the horse is, there's nothing to wait for: straight on to them.)
     const files = await Promise.race([loadedHorse(), ready.then(() => null), wait(90).then(() => null)]);
-    if (!alive.current || !files) return;
+    if (!alive.current) return;
+    if (!files) { setUi((u) => ({ ...u, horse: null })); return; } // (not needed after all: nothing left running out of sight)
     if (finaleEl.current) gsap.to(finaleEl.current, { autoAlpha: 0, y: -16, duration: 1, ease: ease.exit });
     hushMusicBox(1.5);
-    setUi((u) => ({ ...u, secret: null, horse: { files, leaving: false, slow: false } })); // (a hidden message left open closes for it)
+    setUi((u) => ({ ...u, secret: null, horse: { files: u.horse?.files ?? files, shown: true, leaving: false, slow: false } })); // (a hidden message left open closes for it)
     // its tune: through once, five seconds' rest, and again, for as long as the horse is running
     let done = false;
-    void prepareSong(files.tune).then((buf) => { if (buf && alive.current && !done) sounds.horse = playWithRests(buf, 0.55, 5); });
+    const tune = horseTune.current ? await horseTune.current : null;
+    // (decoded ahead; if that didn't work, e.g. sound woke only just now, it's decoded now)
+    void (tune ? Promise.resolve(tune) : prepareSong(files.tune)).then((buf) => { if (buf && alive.current && !done) sounds.horse = playWithRests(buf, 0.6, 5); });
     const slowHint = window.setTimeout(() => setUi((u) => (u.horse ? { ...u, horse: { ...u.horse, slow: true } } : u)), 9000);
     await Promise.all([wait(5), Promise.race([ready, wait(90)])]).then(live);
     clearTimeout(slowHint);
@@ -1503,7 +1511,7 @@ export function BusStop({ flying, entered }: Props) {
 
       {/* the running horse, between the countdown and her flowers */}
       {ui.horse && (
-        <div className={`stop__horse${ui.horse.leaving ? ' is-leaving' : ''}`} aria-hidden="true">
+        <div className={`stop__horse${ui.horse.shown ? ' is-shown' : ''}${ui.horse.leaving ? ' is-leaving' : ''}`} aria-hidden="true">
           <video src={ui.horse.files.video} poster={ui.horse.files.poster} autoPlay loop muted playsInline preload="auto" />
           {ui.horse.slow && <p className="stop__horse-note">{content.finale.flowersComing}</p>}
         </div>

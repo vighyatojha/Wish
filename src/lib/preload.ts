@@ -138,17 +138,18 @@ export function preloadStory() {
   // her photo right after the pictures (40 KB: a couple of seconds on its own, with nothing to share the
   // connection with; it's needed at the bunting, half a minute after the scene starts), then the bus film
   const photo = pictures.then(() => download(varshaPhotoUrl));
-  const film = photo.then(() => download(filmUrl));
-  const birdsong = film.then(() => download(birdsongUrl));
-  // the running horse (about 360 KB in all), needed just before her flowers
-  const horse = birdsong.then(async () => {
+  // the running horse next (about 360 KB in all): it's needed only at the end, but it's small, so it comes
+  // early and is always there in time, even on a slow connection or a link that jumps straight to the end
+  const horse = photo.then(async () => {
     const poster = await download(horsePosterUrl);
     const video = await download(horseVideoUrl());
     const tune = await download(horseTuneUrl);
     return { video, poster, tune };
   });
+  const film = horse.then(() => download(filmUrl));
+  const birdsong = film.then(() => download(birdsongUrl));
   // the song for her flowers comes last of all: it's only needed at the very end, minutes later
-  const flowerSong = horse.then(() => download(flowerSongUrl));
+  const flowerSong = birdsong.then(() => download(flowerSongUrl));
   started = { pictures, photo, film, birdsong, horse, flowerSong };
   return started;
 }
