@@ -57,7 +57,7 @@ import { Meaning, preloadMeaning } from '../components/Meaning';
 import { StoryButton, guideReady } from '../components/StoryButton';
 import { Note, type NoteHandle } from '../components/Note';
 import { FairyArt, FairyRig, FAIRIES } from '../components/Fairy';
-import { loadedPictures, loadedPhoto, loadedFilm, loadedBirdsong, loadedFlowerSong, loadedHorse, HORSE_FILES, onProgress, progress, type Pictures, type Horse } from '../lib/preload';
+import { loadedPictures, loadedPhoto, loadedFilm, loadedBirdsong, loadedFlowerSong, loadedHorse, onProgress, progress, type Pictures, type Horse } from '../lib/preload';
 import './busstop.css';
 
 const PIC_W = 1611, PIC_H = 906;
@@ -1222,9 +1222,11 @@ export function BusStop({ flying, entered }: Props) {
   //    seconds, or for as long as her flowers still need to arrive on a slow connection ──
   async function horseRun(kind: FlowerKind) {
     const ready = Promise.all([loadFlower(kind), loadedFlowerSong()]);
-    // (its files came long ago; if not, the browser fetches them directly)
-    const files = await Promise.race([loadedHorse(), wait(1.5).then(() => HORSE_FILES)]);
-    if (!alive.current) return;
+    // (its files came minutes ago; if they're still on their way, the finale message stays a little longer
+    //  and the horse comes the moment they're here, so there's never an empty space. If her flowers are
+    //  ready before the horse is, there's nothing to wait for: straight on to them.)
+    const files = await Promise.race([loadedHorse(), ready.then(() => null), wait(90).then(() => null)]);
+    if (!alive.current || !files) return;
     if (finaleEl.current) gsap.to(finaleEl.current, { autoAlpha: 0, y: -16, duration: 1, ease: ease.exit });
     hushMusicBox(1.5);
     setUi((u) => ({ ...u, secret: null, horse: { files, leaving: false, slow: false } })); // (a hidden message left open closes for it)

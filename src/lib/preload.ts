@@ -125,8 +125,7 @@ function decoded(src: string): Promise<string> {
 /** the little running horse (between the last countdown and her flowers): its film, its first frame, its tune */
 export interface Horse { video: string; poster: string; tune: string }
 /** the horse's film in a format this browser plays (WebM where it can, MP4 otherwise, e.g. older iPhones) */
-export const horseVideoUrl = (): string => (document.createElement('video').canPlayType('video/webm; codecs="vp9"') ? horseWebmUrl : horseMp4Url);
-export const HORSE_FILES: Horse = { get video() { return horseVideoUrl(); }, poster: horsePosterUrl, tune: horseTuneUrl };
+const horseVideoUrl = (): string => (document.createElement('video').canPlayType('video/webm; codecs="vp9"') ? horseWebmUrl : horseMp4Url);
 
 let started: { pictures: Promise<Pictures>; photo: Promise<string>; film: Promise<string>; birdsong: Promise<string>; horse: Promise<Horse>; flowerSong: Promise<string> } | null = null;
 
