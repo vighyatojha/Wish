@@ -13,7 +13,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { content } from '../content';
 import { InkText } from '../components/InkText';
 import { gsap, useGSAP, ease, dur } from '../lib/motion';
-import { unlockAudio, createRainSound } from '../lib/audio';
+import { unlockAudio, createRainSound, playBirthdayTune, type LiveSound } from '../lib/audio';
 import usPhotoUrl from '../assets/us-photo.webp';
 import { enterImmersive, keepAwake, buzz, settleViewport, prefersReducedMotion, isTouch } from '../lib/device';
 import { Paper } from '../lib/paper';
@@ -77,9 +77,14 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
   useEffect(() => { fitNote(); }, [typing, phase]);
 
   // ── 1. First tap ───────────────────────────────────────────
+  // her tune while she's on this page (it goes quiet the moment her answer is right)
+  const tune = useRef<LiveSound | null>(null);
+  useEffect(() => () => tune.current?.stop(0.2), []);
+
   const begin = () => {
     // these must run while the tap is still "fresh"
     unlockAudio();
+    tune.current ??= playBirthdayTune();
     void enterImmersive();
     void keepAwake();
     buzz(12);
@@ -165,6 +170,8 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
 
   async function letIn() {
     busy.current = true;
+    tune.current?.stop(0.45); // (silent just after her answer: the rain takes over)
+    tune.current = null;
     buzz([18, 70, 18]);
     const input = inputRef.current!;
     input.readOnly = true;

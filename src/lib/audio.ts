@@ -529,6 +529,64 @@ export function playMusicBox(beat = 0.43): number {
   return t - t0 + 1.5;
 }
 
+// ── Page 1's tune: "Happy Birthday" on a little toy piano, bouncy and soft, round and round (with a short
+//    breath between) until it's stopped. Returns a handle to fade it away. ──
+export function playBirthdayTune(level = 0.3, beat = 0.34, rest = 1.6): LiveSound {
+  if (!ctx || !master) return silent;
+  const ac = ctx;
+  if (ac.state === 'suspended') void ac.resume();
+  const out = new GainNode(ac, { gain: 0 });
+  out.gain.setValueAtTime(0, ac.currentTime);
+  out.gain.linearRampToValueAtTime(level, ac.currentTime + 1.2);
+  const lp = new BiquadFilterNode(ac, { type: 'lowpass', frequency: 4200 });
+  out.connect(lp).connect(master);
+  const N: Record<string, number> = { F3: 174.61, G3: 196, C4: 261.63, E4: 329.63, G4: 392, A4: 440, B4: 493.88, C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99 };
+  const tune: [string, number][] = [
+    ['G4', 0.75], ['G4', 0.25], ['A4', 1], ['G4', 1], ['C5', 1], ['B4', 2],
+    ['G4', 0.75], ['G4', 0.25], ['A4', 1], ['G4', 1], ['D5', 1], ['C5', 2],
+    ['G4', 0.75], ['G4', 0.25], ['G5', 1], ['E5', 1], ['C5', 1], ['B4', 1], ['A4', 2],
+    ['F5', 0.75], ['F5', 0.25], ['E5', 1], ['C5', 1], ['D5', 1], ['C5', 3],
+  ];
+  // a light "oom-pa" under it, on the first beat of each bar
+  const bass: [string, number][] = [['C4', 1], ['G3', 4], ['G3', 7], ['C4', 10], ['C4', 13], ['F3', 16], ['C4', 19], ['G3', 22], ['C4', 23]];
+  const live: OscillatorNode[] = [];
+  const key = (f: number, t: number, lvl: number, decay: number) => {
+    // a toy piano: a bright little strike that dies away quickly, with a tinny overtone
+    for (const [mult, amp, type] of [[1, 1, 'triangle'], [2, 0.18, 'sine'], [4.17, 0.06, 'sine']] as const) {
+      const o = new OscillatorNode(ac, { type, frequency: f * mult });
+      const g = new GainNode(ac, { gain: 0 });
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(lvl * amp, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + decay / mult ** 0.6);
+      o.connect(g).connect(out);
+      o.start(t); o.stop(t + decay + 0.05);
+      live.push(o);
+      o.onended = () => { const i = live.indexOf(o); if (i >= 0) live.splice(i, 1); };
+    }
+  };
+  let timer = 0, stopped = false;
+  const once = (t0: number) => {
+    let t = t0;
+    for (const [n, d] of tune) { key(N[n], t, 0.22, 0.9); t += d * beat; }
+    for (const [n, at] of bass) key(N[n], t0 + beat * at, 0.09, 0.7);
+    const next = t + rest;
+    timer = window.setTimeout(() => { if (!stopped) once(next); }, Math.max(0, (next - ac.currentTime - 0.8) * 1000));
+  };
+  once(ac.currentTime + 0.25);
+  return {
+    setLevel(v: number) { out.gain.setTargetAtTime(clamp01(v) * level, ac.currentTime, 0.2); },
+    stop(fade = 0.4) {
+      stopped = true;
+      clearTimeout(timer);
+      const now = ac.currentTime;
+      out.gain.cancelScheduledValues(now);
+      out.gain.setValueAtTime(out.gain.value, now);
+      out.gain.linearRampToValueAtTime(0, now + fade);
+      for (const o of live) { try { o.stop(now + fade + 0.05); } catch { /* already stopped */ } }
+    },
+  };
+}
+
 // ── A recorded song (her flowers' song): decoded ahead of time, played through the same sound switch ──
 const decoded = new Map<string, Promise<AudioBuffer | null>>();
 /** Downloads (if needed) and decodes a song so it can start the instant it's wanted. */
