@@ -1,4 +1,4 @@
-// Phone-level helpers: fullscreen, landscape, screen wake, vibration.
+// Phone-level helpers: fullscreen, screen wake, vibration.
 // Every call is wrapped so a browser that says "no" never breaks the site.
 
 export const isTouch = window.matchMedia('(pointer: coarse)').matches;
@@ -14,11 +14,8 @@ export async function enterImmersive(): Promise<void> {
     if (!document.fullscreenElement) {
       await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
     }
-    // the story is best seen wide: turn to landscape (Android; iPhones keep whatever way it's held)
-    const orientation = screen.orientation as ScreenOrientation & {
-      lock?: (o: 'landscape') => Promise<void>;
-    };
-    await orientation.lock?.('landscape');
+    // Respect the orientation chosen by the visitor. The story has dedicated
+    // portrait and landscape layouts, so forcing rotation can hide content.
   } catch {
     /* Not allowed here. The site still works in a normal tab. */
   }

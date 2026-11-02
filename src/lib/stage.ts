@@ -465,6 +465,12 @@ export class Stage {
 
   render(f: StageFrame): void {
     const { gl, u, video } = this;
+    // Once the browser loses the graphics context, WebGL commands become no-ops.
+    // Stop issuing per-frame work immediately; the scene can reveal its still-image fallback.
+    if (this.broken || gl.isContextLost()) {
+      if (!this.broken) this.broken = 'graphics context lost';
+      return;
+    }
     // copy the newest video frame across while the bus is arriving
     // (while the film plays, every new frame is copied, even before it's faded in: otherwise
     // the first frame never arrives and the bus could only fade in like a ghost)
