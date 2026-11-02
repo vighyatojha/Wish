@@ -40,6 +40,14 @@ export interface Response {
   attempt: number;
 }
 
+/** each answer gets a readable name in the console, in time order: "2026-11-03 00:12:05 · Page 1 · 19+9 · try 1" */
+function nameFor(d: Response): string {
+  const t = new Date(), p = (n: number) => String(n).padStart(2, '0');
+  const stamp = `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())}`;
+  const what = d.scene === 'intro' ? `Page 1 · 19+9 · try ${d.attempt}` : d.scene === 'bus-stop' ? 'Favourite flower' : d.scene;
+  return `${stamp} · ${what}`.replace(/\//g, '-');
+}
+
 export async function saveResponse(data: Response): Promise<void> {
   const conn = connect();
   if (!conn) {
@@ -48,7 +56,7 @@ export async function saveResponse(data: Response): Promise<void> {
   }
   try {
     const { db, fs } = await conn;
-    await fs.addDoc(fs.collection(db, 'responses'), { ...data, session: sessionId, at: fs.serverTimestamp() });
+    await fs.setDoc(fs.doc(db, 'responses', nameFor(data)), { ...data, session: sessionId, at: fs.serverTimestamp() });
   } catch (err) {
     console.warn('Could not save the answer:', err);
   }
