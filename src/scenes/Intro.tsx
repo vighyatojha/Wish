@@ -15,7 +15,7 @@ import { InkText } from '../components/InkText';
 import { gsap, useGSAP, ease, dur } from '../lib/motion';
 import { unlockAudio, createRainSound } from '../lib/audio';
 import usPhotoUrl from '../assets/us-photo.webp';
-import { enterImmersive, keepAwake, buzz, settleViewport, prefersReducedMotion } from '../lib/device';
+import { enterImmersive, keepAwake, buzz, settleViewport, prefersReducedMotion, isTouch } from '../lib/device';
 import { Paper } from '../lib/paper';
 import { Rain, WetMap } from '../lib/rain';
 import { paintInk } from '../lib/ink';
@@ -86,6 +86,20 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
     setPhase('question');
   };
 
+  // ── the number pad: she answers with it, so a phone's own keyboard never opens and pushes the page about
+  //    (on a laptop she can still type as well) ──
+  const fresh = useRef(false); // (after a wrong answer, the next number starts a new one)
+  const press = (key: string) => {
+    const input = inputRef.current;
+    if (!input || busy.current || phase !== 'question') return;
+    buzz(8);
+    if (key === 'C') input.value = '';
+    else if (key === '⌫') input.value = input.value.slice(0, -1);
+    else input.value = (fresh.current ? '' : input.value).slice(0, 5) + key;
+    fresh.current = false;
+    if (!isTouch) input.focus();
+  };
+
   // ── 2. The page writes itself in ───────────────────────────
   useGSAP(
     () => {
@@ -145,7 +159,8 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
     gsap.fromTo(input, { x: 0 }, { keyframes: { x: [0, -9, 8, -6, 3, 0] }, duration: 0.4, ease: 'steps(6)' });
     const hint = copy.hints[n - 2];
     setFeedback(n === 1 || !hint ? copy.wrongMessage : hint);
-    input.select();
+    fresh.current = true; // (the next number from the pad starts a new answer)
+    if (!isTouch) input.select();
   });
 
   async function letIn() {
@@ -285,7 +300,8 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
               className="intro__input"
               name="answer"
               type="text"
-              inputMode="numeric"
+              inputMode={isTouch ? 'none' : 'numeric'}
+              readOnly={isTouch}
               data-ink-input=""
               placeholder={copy.placeholder}
               enterKeyHint="go"
@@ -294,9 +310,17 @@ export function Intro({ onRainStart, onPaperBreaking, onDone }: Props) {
               autoCorrect="off"
               spellCheck={false}
               maxLength={80}
-              onFocus={() => { clearTimeout(blurTimer.current); setTyping(true); }}
+              onFocus={() => { clearTimeout(blurTimer.current); if (!isTouch) setTyping(true); }}
+              onInput={() => { fresh.current = false; }}
               onBlur={() => { clearTimeout(blurTimer.current); blurTimer.current = window.setTimeout(() => setTyping(false), 400); }}
             />
+            {/* a number pad, crayon-coloured, a little crooked, like the rest of the page */}
+            <div className="kid__pad" role="group" aria-label="Number pad">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((k, i) => (
+                <InkText key={k} as="button" type="button" className={`kid__key kid__key--${i % 6}`} text={k}
+                  aria-label={k === '⌫' ? 'Delete' : k === 'C' ? 'Clear' : k} onClick={() => press(k)} />
+              ))}
+            </div>
             <InkText as="button" className="intro__submit" type="submit" text={copy.button} />
             <InkText className="intro__feedback" role="status" aria-live="polite" text={feedback} />
           </form>

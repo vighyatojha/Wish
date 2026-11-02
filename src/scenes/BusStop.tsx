@@ -1240,7 +1240,7 @@ export function BusStop({ flying, entered }: Props) {
     let done = false;
     const tune = horseTune.current ? await horseTune.current : null;
     // (decoded ahead; if that didn't work, e.g. sound woke only just now, it's decoded now)
-    void (tune ? Promise.resolve(tune) : prepareSong(files.tune)).then((buf) => { if (buf && alive.current && !done) sounds.horse = playWithRests(buf, 0.6, 5); });
+    void (tune ? Promise.resolve(tune) : prepareSong(files.tune)).then((buf) => { if (buf && alive.current && !done) sounds.horse = playWithRests(buf, 0.3, 5, 3); /* (soft, in the background: it rises slowly each time) */ });
     const slowHint = window.setTimeout(() => setUi((u) => (u.horse ? { ...u, horse: { ...u.horse, slow: true } } : u)), 9000);
     await Promise.all([wait(5), Promise.race([ready, wait(90)])]).then(live);
     clearTimeout(slowHint);

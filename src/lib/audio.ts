@@ -577,19 +577,21 @@ export function songPulse(): number | null {
 
 /** Plays a decoded tune, then after `gap` seconds of quiet plays it again, and so on, for as long as it's
  *  wanted (the running horse's tune: it plays through, rests five seconds, and starts over). */
-export function playWithRests(buf: AudioBuffer, level = 0.5, gap = 5, fadeIn = 0.8): LiveSound {
+export function playWithRests(buf: AudioBuffer, level = 0.5, gap = 5, fadeIn = 3): LiveSound {
   if (!ctx || !master) return silent;
   const ac = ctx;
   if (ac.state === 'suspended') void ac.resume();
-  const out = new GainNode(ac, { gain: 0 });
+  const out = new GainNode(ac, { gain: level });
   out.connect(master);
-  out.gain.setValueAtTime(0, ac.currentTime);
-  out.gain.linearRampToValueAtTime(level, ac.currentTime + fadeIn);
   const live: AudioBufferSourceNode[] = [];
   let timer = 0, stopped = false;
   const play = (at: number) => {
+    // every time it starts (the first time, and after each rest) it rises slowly out of silence
     const src = new AudioBufferSourceNode(ac, { buffer: buf });
-    src.connect(out);
+    const swell = new GainNode(ac, { gain: 0 });
+    swell.gain.setValueAtTime(0, at);
+    swell.gain.setTargetAtTime(1, at, fadeIn / 3); // (a soft curve: most of the way up in `fadeIn` seconds)
+    src.connect(swell).connect(out);
     src.start(at);
     live.push(src);
     src.onended = () => { const i = live.indexOf(src); if (i >= 0) live.splice(i, 1); };
