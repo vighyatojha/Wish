@@ -125,7 +125,7 @@ function GardenWords({ text, perLine = 0 }: { text: string; perLine?: number }) 
         palette: ['paper', 'transparent', '#e3344c', '#3f8a4a', '#fff4ea', '#2b2420', '#1d4a26'],
         flowers: ['#e3344c', '#f2789f', '#f2b92e', '#f39a6b', '#a77fd8'],
         transparent: true, interactive: false, caret: false, scale: 0.42, density: 0.75, legible: true,
-        maxDpr: 2, font: '"Playfair Display",Georgia,serif', wordsPerLine: perLine,
+        maxDpr: 2, font: '"Playfair Display",Georgia,serif', wordsPerLine: perLine, align: perLine ? 'left' : 'center',
       });
       tg.start();
       let at = 350;

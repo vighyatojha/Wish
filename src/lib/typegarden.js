@@ -321,7 +321,8 @@ export class TypeGarden {
       const Sf = Math.min(H * 0.86 / (ls.length * LHf), widest > 0 ? maxW / widest : S0, S0);
       const nf = ls.length;
       ls.forEach((li, k) => {
-        let x = W / 2 - lineW(li, Sf) / 2;
+        // (opts.align 'left': every line starts at the same left edge; otherwise each is centred)
+        let x = this.opts.align === 'left' ? (W - maxW) / 2 : W / 2 - lineW(li, Sf) / 2;
         const y = H / 2 + (k - (nf - 1) / 2) * LHf * Sf + 0.33 * Sf;
         li.forEach((i) => { const l = A[i], w = ws[i] * Sf; l.tx = x + w / 2; l.ty = y; l.tw = w; l.line = k; x += w; });
       });

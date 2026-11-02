@@ -11,6 +11,8 @@ export interface GardenOptions {
   scale?: number;
   /** a fixed number of words on each line (e.g. 2), so a phrase stacks in short lines and can be larger */
   wordsPerLine?: number;
+  /** with wordsPerLine: 'left' starts every line at the same left edge (default: centred) */
+  align?: 'left' | 'center';
   legible?: boolean;
   maxDpr?: number;
   font?: string;
