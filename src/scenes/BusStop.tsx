@@ -1513,7 +1513,9 @@ export function BusStop({ flying, entered }: Props) {
       {ui.horse && (
         <div className={`stop__horse${ui.horse.shown ? ' is-shown' : ''}${ui.horse.leaving ? ' is-leaving' : ''}`} aria-hidden="true">
           <video src={ui.horse.files.video} poster={ui.horse.files.poster} autoPlay loop muted playsInline preload="auto" />
-          {ui.horse.slow && <p className="stop__horse-note">{content.finale.flowersComing}</p>}
+          <p className="stop__horse-note">
+            {ui.horse.slow ? content.finale.flowersComing : <>{content.finale.horseLoading}<span className="stop__dots"><i>.</i><i>.</i><i>.</i></span></>}
+          </p>
         </div>
       )}
 

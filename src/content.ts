@@ -154,6 +154,8 @@ export const content = {
     gardenWords: 'for Varsha',
     // (only on a slow connection, if her flowers are still on their way when it's time for them to open)
     flowersComing: 'her flowers are on their way…',
+    // (under the little running horse, after the countdown; the dots after it move by themselves)
+    horseLoading: 'Loading',
   },
 
   // The last screen: he appears as a guide (a crumpled paper that unfolds into him) and tells her
